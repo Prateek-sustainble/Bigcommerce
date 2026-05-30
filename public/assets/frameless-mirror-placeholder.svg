@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-label="Frameless mirror">
+  <defs>
+    <linearGradient id="mirror" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6f7f7"/>
+      <stop offset="0.34" stop-color="#dfe2e1"/>
+      <stop offset="0.66" stop-color="#c3c7c4"/>
+      <stop offset="1" stop-color="#aeb2af"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="640" fill="#ffffff"/>
+  <rect x="72" y="72" width="496" height="496" rx="4" fill="url(#mirror)" stroke="#b6b9b7" stroke-width="8"/>
+  <path d="M88 92h300L88 392Z" fill="url(#shine)" opacity="0.5"/>
+</svg>

@@ -1,0 +1,12 @@
+<!-- Security Mirror Frameless Mirror calculator embed -->
+<link rel="stylesheet" href="https://YOUR-RENDER-APP.onrender.com/security-mirror-widget.css">
+<div id="security-mirror-calculator"></div>
+<script src="https://YOUR-RENDER-APP.onrender.com/security-mirror-widget.js"></script>
+<script>
+  window.SecurityMirrorCalculator.init({
+    root: "#security-mirror-calculator",
+    apiBase: "https://YOUR-RENDER-APP.onrender.com",
+    type: "frameless_mirror",
+    customerGroup: "{{#if customer}}{{customer.customer_group_name}}{{else}}Guest{{/if}}"
+  });
+</script>

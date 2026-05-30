@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: security-mirror-calculator
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BIGCOMMERCE_CART_CURRENCY
+        value: CAD
+      - key: ALLOWED_ORIGIN
+        value: https://securitymirror.com
+      - key: REQUIRE_QUOTE_TOKEN
+        value: "true"
+      - key: QUOTE_SIGNING_SECRET
+        sync: false
+      - key: BIGCOMMERCE_STORE_HASH
+        sync: false
+      - key: BIGCOMMERCE_ACCESS_TOKEN
+        sync: false

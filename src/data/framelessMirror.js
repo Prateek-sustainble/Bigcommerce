@@ -1,0 +1,83 @@
+export const FRAMELESS_MIRROR_CONFIG = {
+  key: "frameless_mirror",
+  label: "Frameless Mirror",
+  currency: {
+    cad: "CAD",
+    usd: "USD",
+  },
+  dimensions: {
+    minWidthInches: 12,
+    minHeightInches: 12,
+    maxBothSidesInches: 48,
+    maxOneSideInches: 96,
+    minSquareFeet: 2,
+    sizeRoundingIncrementInches: 2,
+  },
+  surchargeRate: 0.16,
+  items: [
+    {
+      itemType: "Clear",
+      label: "Clear Mirror 5mm",
+      abbreviation: "CM5MM",
+      pricePerSquareFoot: 19.5,
+      edgeWorkPerInch: {
+        No: 0,
+        "Clean Cut": 0.02,
+        "Arrised Edge": 0.155,
+        "Polished Edge": 7.25,
+      },
+      shatterStopPerSquareFoot: 7.25,
+    },
+    {
+      itemType: "Clear",
+      label: "Clear Mirror 6mm",
+      abbreviation: "CM6MM",
+      pricePerSquareFoot: 20.5,
+      edgeWorkPerInch: {
+        No: 0,
+        "Clean Cut": 0.02,
+        "Arrised Edge": 0.155,
+        "Polished Edge": 7.25,
+      },
+      shatterStopPerSquareFoot: 7.25,
+    },
+    {
+      itemType: "Acrylic",
+      label: "Acrylic Mirror 3mm",
+      abbreviation: "AM3MM",
+      pricePerSquareFoot: 37.25,
+      edgeWorkPerInch: {
+        No: 0,
+        "Clean Cut": 0.02,
+        "Arrised Edge": 0.335,
+        "Polished Edge": 7.25,
+      },
+      shatterStopPerSquareFoot: 7.25,
+    },
+    {
+      itemType: "Acrylic",
+      label: "Acrylic Mirror 6mm",
+      abbreviation: "AM6MM",
+      pricePerSquareFoot: 66.25,
+      edgeWorkPerInch: {
+        No: 0,
+        "Clean Cut": 0.02,
+        "Arrised Edge": 0.335,
+        "Polished Edge": 7.25,
+      },
+      shatterStopPerSquareFoot: 7.25,
+    },
+  ],
+  edgeWorks: ["No", "Clean Cut", "Arrised Edge", "Polished Edge"],
+  shatterStopOptions: ["No", "Yes"],
+  images: {
+    baseUrl: "https://saddlebrown-turkey-900185.hostingersite.com/Images",
+    lowerCasePattern: "FRAMELSS_MIRROR_{description}.png",
+    galleryPattern: "FRAMELSS_MIRROR_{DESCRIPTION}-{index}.png",
+  },
+  datasheets: {
+    en: "https://saddlebrown-turkey-900185.hostingersite.com/datasheet/Datasheet_Frameless-Mirror.pdf",
+    fr: "https://saddlebrown-turkey-900185.hostingersite.com/datasheet_fr/Datasheet_Frameless-Mirror_FR.pdf",
+  },
+  fallbackImageUrl: "/assets/frameless-mirror-placeholder.svg",
+};

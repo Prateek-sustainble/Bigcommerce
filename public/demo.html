@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Security Mirror Calculator Demo</title>
+    <link rel="stylesheet" href="/security-mirror-widget.css">
+    <style>
+      body {
+        margin: 0;
+        color: #26283f;
+        font-family: Montserrat, Arial, sans-serif;
+        background: #fff;
+      }
+
+      header {
+        display: grid;
+        place-items: center;
+        min-height: 132px;
+        border-bottom: 1px solid #dcdce2;
+      }
+
+      .demo-logo {
+        width: 220px;
+        height: auto;
+      }
+
+      .demo-title {
+        border-bottom: 1px solid #dcdce2;
+      }
+
+      .demo-title__inner {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 22px 24px;
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(22px, 2vw, 30px);
+        font-weight: 500;
+        letter-spacing: 2px;
+      }
+
+      .crumb {
+        align-self: center;
+        font-size: 14px;
+      }
+
+      @media (max-width: 720px) {
+        .demo-title__inner {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg class="demo-logo" viewBox="0 0 320 130" role="img" aria-label="Security Mirror">
+        <rect x="10" y="10" width="106" height="106" fill="none" stroke="#000" stroke-width="8"></rect>
+        <path d="M30 94 97 27M30 64 67 27M30 34 37 27" stroke="#000" stroke-width="9"></path>
+        <text x="120" y="76" font-family="Arial, sans-serif" font-size="34" font-weight="700">Security</text>
+        <text x="120" y="108" font-family="Arial, sans-serif" font-size="34" font-weight="700">Mirror</text>
+      </svg>
+    </header>
+    <section class="demo-title">
+      <div class="demo-title__inner">
+        <h1>FRAMELESS MIRROR (SPECIAL)</h1>
+        <div class="crumb">Home › Frameless Mirrors (Special)</div>
+      </div>
+    </section>
+
+    <main>
+      <div id="security-mirror-calculator"></div>
+    </main>
+
+    <script src="/security-mirror-widget.js"></script>
+    <script>
+      window.SecurityMirrorCalculator.init({
+        root: "#security-mirror-calculator",
+        apiBase: "",
+        type: "frameless_mirror",
+        customerGroup: "House"
+      });
+    </script>
+  </body>
+</html>
