@@ -12,9 +12,17 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(__dirname, "../public");
 const port = Number(process.env.PORT || 3000);
-const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+const allowedOrigins = (process.env.ALLOWED_ORIGIN || "*")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const quoteSigningSecret = process.env.QUOTE_SIGNING_SECRET || "dev-quote-secret-change-me";
 const requireQuoteToken = process.env.REQUIRE_QUOTE_TOKEN === "true";
+const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction && quoteSigningSecret === "dev-quote-secret-change-me") {
+  throw new Error("QUOTE_SIGNING_SECRET must be set in production.");
+}
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -25,20 +33,29 @@ const mimeTypes = {
   ".png": "image/png",
 };
 
-function sendJson(res, statusCode, payload) {
+function corsOrigin(req) {
+  if (allowedOrigins.includes("*")) return "*";
+  const requestOrigin = req.headers.origin;
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) return requestOrigin;
+  return allowedOrigins[0] || "*";
+}
+
+function sendJson(req, res, statusCode, payload) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": corsOrigin(req),
+    Vary: "Origin",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
   });
   res.end(JSON.stringify(payload));
 }
 
-function sendText(res, statusCode, text) {
+function sendText(req, res, statusCode, text) {
   res.writeHead(statusCode, {
     "Content-Type": "text/plain; charset=utf-8",
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": corsOrigin(req),
+    Vary: "Origin",
   });
   res.end(text);
 }
@@ -47,7 +64,13 @@ async function readJson(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   if (chunks.length === 0) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    const error = new Error("Request body must be valid JSON.");
+    error.status = 400;
+    throw error;
+  }
 }
 
 function quoteForPayload(payload) {
@@ -71,7 +94,7 @@ async function serveStatic(req, res, url) {
   const resolvedPath = path.resolve(publicDir, relativePath);
 
   if (!resolvedPath.startsWith(publicDir)) {
-    sendText(res, 403, "Forbidden");
+    sendText(req, res, 403, "Forbidden");
     return;
   }
 
@@ -80,32 +103,33 @@ async function serveStatic(req, res, url) {
     const extension = path.extname(resolvedPath);
     res.writeHead(200, {
       "Content-Type": mimeTypes[extension] || "application/octet-stream",
-      "Access-Control-Allow-Origin": allowedOrigin,
+      "Access-Control-Allow-Origin": corsOrigin(req),
+      Vary: "Origin",
     });
     res.end(file);
   } catch {
-    sendText(res, 404, "Not found");
+    sendText(req, res, 404, "Not found");
   }
 }
 
 async function handleApi(req, res, url) {
   if (req.method === "OPTIONS") {
-    sendJson(res, 204, {});
+    sendJson(req, res, 204, {});
     return;
   }
 
   if (req.method === "GET" && url.pathname === "/health") {
-    sendJson(res, 200, { ok: true });
+    sendJson(req, res, 200, { ok: true });
     return;
   }
 
   if (req.method === "GET" && url.pathname === "/api/calculator/config") {
     const type = url.searchParams.get("type") || "frameless_mirror";
     if (type !== "frameless_mirror") {
-      sendJson(res, 404, { ok: false, message: `Unsupported calculator type: ${type}` });
+      sendJson(req, res, 404, { ok: false, message: `Unsupported calculator type: ${type}` });
       return;
     }
-    sendJson(res, 200, { ok: true, config: getFramelessMirrorPublicConfig() });
+    sendJson(req, res, 200, { ok: true, config: getFramelessMirrorPublicConfig() });
     return;
   }
 
@@ -113,10 +137,10 @@ async function handleApi(req, res, url) {
     const payload = await readJson(req);
     const quote = quoteForPayload(payload);
     if (!quote.ok) {
-      sendJson(res, 422, quote);
+      sendJson(req, res, 422, quote);
       return;
     }
-    sendJson(res, 200, signedQuoteResponse(quote));
+    sendJson(req, res, 200, signedQuoteResponse(quote));
     return;
   }
 
@@ -124,7 +148,7 @@ async function handleApi(req, res, url) {
     const payload = await readJson(req);
     const quote = quoteForPayload(payload);
     if (!quote.ok) {
-      sendJson(res, 422, quote);
+      sendJson(req, res, 422, quote);
       return;
     }
 
@@ -133,7 +157,7 @@ async function handleApi(req, res, url) {
       try {
         tokenPayload = verifyQuoteToken(payload.quoteToken, quoteSigningSecret);
       } catch (error) {
-        sendJson(res, 401, {
+        sendJson(req, res, 401, {
           ok: false,
           status: "invalid_quote_token",
           message: error.message,
@@ -142,7 +166,7 @@ async function handleApi(req, res, url) {
       }
 
       if (!verifyQuoteMatchesToken(quote, tokenPayload)) {
-        sendJson(res, 409, {
+        sendJson(req, res, 409, {
           ok: false,
           status: "quote_mismatch",
           message: "Quote details do not match the signed quote token.",
@@ -150,7 +174,7 @@ async function handleApi(req, res, url) {
         return;
       }
     } else if (requireQuoteToken) {
-      sendJson(res, 400, {
+      sendJson(req, res, 400, {
         ok: false,
         status: "quote_token_required",
         message: "quoteToken is required for add-to-cart.",
@@ -159,7 +183,7 @@ async function handleApi(req, res, url) {
     }
 
     if (!process.env.BIGCOMMERCE_STORE_HASH || !process.env.BIGCOMMERCE_ACCESS_TOKEN) {
-      sendJson(res, 501, {
+      sendJson(req, res, 501, {
         ok: false,
         status: "bigcommerce_not_configured",
         message: "Quote is valid, but BigCommerce credentials are not configured on this server.",
@@ -174,11 +198,11 @@ async function handleApi(req, res, url) {
       customerId: payload.customerId,
       channelId: payload.channelId,
     });
-    sendJson(res, 200, { ok: true, quote: signedQuoteResponse(quote), cart });
+    sendJson(req, res, 200, { ok: true, quote: signedQuoteResponse(quote), cart });
     return;
   }
 
-  sendJson(res, 404, { ok: false, message: "Not found" });
+  sendJson(req, res, 404, { ok: false, message: "Not found" });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -190,7 +214,7 @@ const server = http.createServer(async (req, res) => {
     }
     await serveStatic(req, res, url);
   } catch (error) {
-    sendJson(res, error.status || 500, {
+    sendJson(req, res, error.status || 500, {
       ok: false,
       message: error.message || "Server error",
       details: error.response,

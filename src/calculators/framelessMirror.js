@@ -80,6 +80,17 @@ function imageUrls(itemLabel) {
   };
 }
 
+function resolveOptionImageOverride(itemLabel, edgeWork, shatterStop) {
+  const overrides = FRAMELESS_MIRROR_CONFIG.images.optionImageOverrides || [];
+  const match = overrides.find((entry) => {
+    if (entry.item && entry.item !== itemLabel) return false;
+    if (entry.edgeWork && entry.edgeWork !== edgeWork) return false;
+    if (entry.shatterStop && entry.shatterStop !== shatterStop) return false;
+    return Boolean(entry.primaryImageUrl);
+  });
+  return match || null;
+}
+
 function unavailable(message) {
   return {
     ok: false,
@@ -155,6 +166,10 @@ export function calculateFramelessMirrorQuote(input = {}) {
   const shatterStopText = shatterStop === "Yes" ? "Shatter Stop Yes" : "No Shatter Stop";
   const sku = `FRAMELESS-${item.abbreviation}-CUSTOM`;
   const description = `FRAMELESS-Series-Item ${item.label}-Width${widthLabel}xHeight${heightLabel}- ${edgeWork}- ${shatterStopText}`;
+  const defaultImages = imageUrls(item.label);
+  const override = resolveOptionImageOverride(item.label, edgeWork, shatterStop);
+  const primaryImageUrl = override?.primaryImageUrl || defaultImages.primaryImageUrl;
+  const gallery = override?.gallery || defaultImages.gallery;
 
   return {
     ok: true,
@@ -196,7 +211,8 @@ export function calculateFramelessMirrorQuote(input = {}) {
     sku,
     description,
     assets: {
-      ...imageUrls(item.label),
+      primaryImageUrl,
+      gallery,
       fallbackImageUrl: FRAMELESS_MIRROR_CONFIG.fallbackImageUrl,
       datasheets: FRAMELESS_MIRROR_CONFIG.datasheets,
     },
@@ -213,5 +229,6 @@ export function getFramelessMirrorPublicConfig() {
     dimensions: FRAMELESS_MIRROR_CONFIG.dimensions,
     datasheets: FRAMELESS_MIRROR_CONFIG.datasheets,
     fallbackImageUrl: FRAMELESS_MIRROR_CONFIG.fallbackImageUrl,
+    optionImageOverrides: FRAMELESS_MIRROR_CONFIG.images.optionImageOverrides || [],
   };
 }

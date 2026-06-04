@@ -4,6 +4,8 @@
     apiBase: "",
     type: "frameless_mirror",
     customerGroup: "House",
+    hideCustomerField: false,
+    lockCustomerGroup: false,
   };
 
   const fractionOptions = [
@@ -59,6 +61,29 @@
     };
   }
 
+  function normalizeCustomerGroup(value) {
+    if (!value) return "";
+    const normalized = String(value).trim().toLowerCase();
+    const map = {
+      guest: "Guest",
+      contractor: "Contractor",
+      house: "House",
+      special: "Special",
+      elite: "Elite",
+      platinum: "Platinum",
+    };
+    return map[normalized] || "";
+  }
+
+  function customerGroupFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return (
+      normalizeCustomerGroup(params.get("customerType")) ||
+      normalizeCustomerGroup(params.get("customer_group")) ||
+      normalizeCustomerGroup(params.get("cg"))
+    );
+  }
+
   async function requestJson(url, body) {
     const response = await fetch(url, {
       method: "POST",
@@ -68,6 +93,15 @@
     const json = await response.json();
     if (!response.ok) throw json;
     return json;
+  }
+
+  function setImageSource(image, imageUrl, fallbackImageUrl) {
+    if (!image) return;
+    image.onerror = () => {
+      image.onerror = null;
+      image.src = fallbackImageUrl;
+    };
+    image.src = imageUrl || fallbackImageUrl;
   }
 
   function renderShell(root, config, options) {
@@ -124,7 +158,7 @@
           <strong data-sm-output="unitUsd">0.00</strong>
         </div>
 
-        <div class="sm-row">
+        <div class="sm-row" data-sm-row="customerGroup">
           <label>Customer</label>
           <select data-sm-field="customerGroup">
             <option>House</option>
@@ -161,6 +195,7 @@
       <div class="sm-calculator__media">
         <img data-sm-output="image" alt="">
         <div class="sm-thumb"><img data-sm-output="thumb" alt=""></div>
+        <div class="sm-gallery" data-sm-output="gallery"></div>
         <div class="sm-docs">
           <a data-sm-output="datasheetEn" target="_blank" rel="noreferrer">Datasheet</a>
           <a data-sm-output="datasheetFr" target="_blank" rel="noreferrer">Datasheet (French)</a>
@@ -174,6 +209,12 @@
     }
 
     qs(root, "[data-sm-field='customerGroup']").value = options.customerGroup;
+    if (options.hideCustomerField || options.lockCustomerGroup) {
+      qs(root, "[data-sm-row='customerGroup']").classList.add("sm-row--hidden");
+    }
+    if (options.lockCustomerGroup) {
+      qs(root, "[data-sm-field='customerGroup']").setAttribute("disabled", "disabled");
+    }
   }
 
   function applyQuote(root, quote) {
@@ -195,19 +236,54 @@
     const image = qs(root, "[data-sm-output='image']");
     const thumb = qs(root, "[data-sm-output='thumb']");
     const fallbackImageUrl = quote.assets.fallbackImageUrl || "/assets/frameless-mirror-placeholder.svg";
-    image.onerror = () => {
-      image.onerror = null;
-      image.src = fallbackImageUrl;
-    };
-    thumb.onerror = () => {
-      thumb.onerror = null;
-      thumb.src = fallbackImageUrl;
-    };
-    image.src = quote.assets.primaryImageUrl || fallbackImageUrl;
-    thumb.src = quote.assets.primaryImageUrl || fallbackImageUrl;
+    root.dataset.smFallbackImageUrl = fallbackImageUrl;
+    setImageSource(image, quote.assets.primaryImageUrl, fallbackImageUrl);
+    setImageSource(thumb, quote.assets.primaryImageUrl, fallbackImageUrl);
     qs(root, "[data-sm-output='datasheetEn']").href = quote.assets.datasheets.en;
     qs(root, "[data-sm-output='datasheetFr']").href = quote.assets.datasheets.fr;
     root.dataset.smQuoteToken = quote.quoteToken || "";
+    renderGallery(root, quote.assets?.gallery || [], fallbackImageUrl);
+  }
+
+  function renderGallery(root, gallery, fallbackImageUrl) {
+    const media = qs(root, "[data-sm-output='gallery']");
+    if (!media) return;
+
+    const images = gallery.length ? gallery : [fallbackImageUrl];
+    root.dataset.smGallery = JSON.stringify(images);
+    root.dataset.smActiveGalleryIndex = "0";
+    media.innerHTML = images
+      .map(
+        (url, index) => `
+          <button class="sm-gallery__button${index === 0 ? " is-active" : ""}" type="button" data-sm-gallery-index="${index}" aria-label="View image ${index + 1}">
+            <img src="${url}" alt="">
+          </button>
+        `,
+      )
+      .join("");
+    media.querySelectorAll("img").forEach((image) => {
+      image.onerror = () => {
+        image.onerror = null;
+        image.src = fallbackImageUrl;
+      };
+    });
+  }
+
+  function activateGalleryImage(root, index) {
+    const gallery = JSON.parse(root.dataset.smGallery || "[]");
+    const imageUrl = gallery[index];
+    if (!imageUrl) return;
+
+    const image = qs(root, "[data-sm-output='image']");
+    const thumb = qs(root, "[data-sm-output='thumb']");
+    const fallbackImageUrl = root.dataset.smFallbackImageUrl || "/assets/frameless-mirror-placeholder.svg";
+    setImageSource(image, imageUrl, fallbackImageUrl);
+    setImageSource(thumb, imageUrl, fallbackImageUrl);
+    root.dataset.smActiveGalleryIndex = String(index);
+
+    root.querySelectorAll("[data-sm-gallery-index]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.smGalleryIndex === String(index));
+    });
   }
 
   async function updateQuote(root, options) {
@@ -246,7 +322,20 @@
   }
 
   async function init(userOptions) {
-    const options = { ...defaults, ...(userOptions || {}) };
+    const urlCustomerGroup = customerGroupFromUrl();
+    const options = {
+      ...defaults,
+      ...(userOptions || {}),
+      customerGroup: urlCustomerGroup || (userOptions && userOptions.customerGroup) || defaults.customerGroup,
+      lockCustomerGroup:
+        Boolean(urlCustomerGroup) ||
+        Boolean((userOptions || {}).lockCustomerGroup) ||
+        Boolean((userOptions || {}).hideCustomerField),
+      hideCustomerField:
+        Boolean(urlCustomerGroup) ||
+        Boolean((userOptions || {}).hideCustomerField) ||
+        Boolean((userOptions || {}).lockCustomerGroup),
+    };
     const root = typeof options.root === "string" ? document.querySelector(options.root) : options.root;
     if (!root) return;
 
@@ -256,6 +345,11 @@
     renderShell(root, configResponse.config, options);
     root.addEventListener("input", () => updateQuote(root, options));
     root.addEventListener("change", () => updateQuote(root, options));
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-sm-gallery-index]");
+      if (!button || !root.contains(button)) return;
+      activateGalleryImage(root, Number(button.dataset.smGalleryIndex));
+    });
     qs(root, "[data-sm-action='add']").addEventListener("click", () => addToCart(root, options));
     await updateQuote(root, options);
   }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateFramelessMirrorQuote } from "../src/calculators/framelessMirror.js";
+import { FRAMELESS_MIRROR_CONFIG } from "../src/data/framelessMirror.js";
 
 test("matches the Calculator Studio screenshot example", () => {
   const quote = calculateFramelessMirrorQuote({
@@ -65,4 +66,32 @@ test("rejects acrylic edge work per workbook availability rule", () => {
 
   assert.equal(quote.ok, false);
   assert.equal(quote.message, "Polished Not Available");
+});
+
+test("uses option-specific Hostinger image overrides when configured", () => {
+  const override = {
+    item: "Clear Mirror 5mm",
+    edgeWork: "Polished Edge",
+    shatterStop: "Yes",
+    primaryImageUrl: "https://example.com/main.png",
+    gallery: ["https://example.com/one.png", "https://example.com/two.png"],
+  };
+
+  FRAMELESS_MIRROR_CONFIG.images.optionImageOverrides.push(override);
+  try {
+    const quote = calculateFramelessMirrorQuote({
+      customerGroup: "House",
+      item: "Clear Mirror 5mm",
+      widthInches: 24,
+      heightInches: 36,
+      edgeWork: "Polished Edge",
+      shatterStop: "Yes",
+    });
+
+    assert.equal(quote.ok, true);
+    assert.equal(quote.assets.primaryImageUrl, override.primaryImageUrl);
+    assert.deepEqual(quote.assets.gallery, override.gallery);
+  } finally {
+    FRAMELESS_MIRROR_CONFIG.images.optionImageOverrides.pop();
+  }
 });

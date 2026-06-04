@@ -74,6 +74,7 @@ export const FRAMELESS_MIRROR_CONFIG = {
     baseUrl: "https://saddlebrown-turkey-900185.hostingersite.com/Images",
     lowerCasePattern: "FRAMELSS_MIRROR_{description}.png",
     galleryPattern: "FRAMELSS_MIRROR_{DESCRIPTION}-{index}.png",
+    optionImageOverrides: [],
   },
   datasheets: {
     en: "https://saddlebrown-turkey-900185.hostingersite.com/datasheet/Datasheet_Frameless-Mirror.pdf",

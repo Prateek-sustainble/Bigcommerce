@@ -8,6 +8,9 @@ This proof of concept implements the **Frameless Mirror** calculator from `FINAL
 - A BigCommerce embeddable product-page widget.
 - A server-side add-to-cart path for trusted calculated pricing.
 - Signed quote tokens between quote and add-to-cart.
+- URL-driven customer-type locking/hiding (`?cg=House`, `?cg=Contractor`, etc.).
+- Option-based image override hooks for Hostinger-hosted images.
+- Interactive gallery thumbnails driven by the quote response.
 
 ## Run Locally
 
@@ -79,12 +82,50 @@ Stencil product page snippet:
     root: "#security-mirror-calculator",
     apiBase: "https://YOUR-RENDER-APP.onrender.com",
     type: "frameless_mirror",
-    customerGroup: "{{customer.customer_group_name}}"
+    customerGroup: "{{customer.customer_group_name}}",
+    hideCustomerField: true
   });
 </script>
 ```
 
 A ready-to-paste copy also lives at [docs/bigcommerce-frameless-snippet.html](/Users/prateekrana/Documents/BC/docs/bigcommerce-frameless-snippet.html).
+
+## Customer-type specific links
+
+The widget auto-locks customer group from URL query params and hides the selector:
+
+- `?cg=Guest`
+- `?cg=Contractor`
+- `?cg=House`
+- `?cg=Special`
+- `?cg=Elite`
+- `?cg=Platinum`
+
+Examples:
+
+- `https://YOUR-RENDER-APP.onrender.com/demo.html?cg=Contractor`
+- `https://securitymirror.com/frameless-mirror-special/?cg=House`
+
+## Option-based image switching (Hostinger)
+
+Configure image overrides in [src/data/framelessMirror.js](/Users/prateekrana/Documents/BC/src/data/framelessMirror.js) under `images.optionImageOverrides`.
+
+Example entry:
+
+```js
+{
+  item: "Clear Mirror 5mm",
+  edgeWork: "Polished Edge",
+  shatterStop: "Yes",
+  primaryImageUrl: "https://your-hostinger-url/Images/custom-main.png",
+  gallery: [
+    "https://your-hostinger-url/Images/custom-1.png",
+    "https://your-hostinger-url/Images/custom-2.png"
+  ]
+}
+```
+
+The widget automatically swaps the primary image and thumbnail gallery when an override matches the selected item/options.
 
 ## Render Environment
 
@@ -97,6 +138,14 @@ BIGCOMMERCE_CART_CURRENCY=CAD
 ALLOWED_ORIGIN=https://securitymirror.com
 QUOTE_SIGNING_SECRET=replace-with-random-secret
 REQUIRE_QUOTE_TOKEN=true
+```
+
+Create the token under **Settings → Store-level API accounts** in BigCommerce. For this cart flow, give it Carts modify access; the server adds custom items through the V3 Cart API and requests `include=redirect_urls` so the storefront can send the shopper to the BigCommerce cart after a successful add.
+
+For staging plus production, `ALLOWED_ORIGIN` can be comma-separated:
+
+```sh
+ALLOWED_ORIGIN=https://store-abc.mybigcommerce.com,https://securitymirror.com
 ```
 
 Without BigCommerce credentials, `/api/cart/add` recalculates and validates the quote, then returns `bigcommerce_not_configured`.

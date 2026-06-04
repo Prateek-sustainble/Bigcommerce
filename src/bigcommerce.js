@@ -46,7 +46,7 @@ export async function addQuoteToBigCommerceCart({ quote, cartId, customerId, cha
   const customItem = buildCustomItem(quote, currencyCode);
 
   if (cartId) {
-    return requestBigCommerce(`/carts/${cartId}/items`, {
+    return requestBigCommerce(`/carts/${cartId}/items?include=redirect_urls`, {
       custom_items: [customItem],
     });
   }
@@ -60,5 +60,5 @@ export async function addQuoteToBigCommerceCart({ quote, cartId, customerId, cha
   if (customerId) body.customer_id = Number(customerId);
   if (channelId) body.channel_id = Number(channelId);
 
-  return requestBigCommerce("/carts", body);
+  return requestBigCommerce("/carts?include=redirect_urls", body);
 }
