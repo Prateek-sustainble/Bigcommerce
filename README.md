@@ -2,7 +2,7 @@
 
 In-house replacement for the Calculator Studio + Grid pricing flow.
 
-This proof of concept implements the **Frameless Mirror** calculator from `FINAL EXCEL SM Fin V20.5 (1).xlsx` and exposes it as:
+This implements the Security Mirror pricing calculators from `FINAL EXCEL SM Fin V20.5 (1).xlsx` and exposes them as:
 
 - A Render-ready Node API.
 - A BigCommerce embeddable product-page widget.
@@ -11,6 +11,10 @@ This proof of concept implements the **Frameless Mirror** calculator from `FINAL
 - URL-driven customer-type locking/hiding (`?cg=House`, `?cg=Contractor`, etc.).
 - Option-based image override hooks for Hostinger-hosted images.
 - Interactive gallery thumbnails driven by the quote response.
+
+Supported calculator types:
+
+`frameless_mirror`, `cut_glass`, `shelves`, `kick_plates`, `antique`, `u_guard`, `corner_guard`, `j_mould`, `series_850`, `series_850_ft`, `series_3200`, `series_3200_ft`, `series_3300`, `series_4100`, `convex_domes`.
 
 ## Run Locally
 
@@ -74,13 +78,13 @@ Upload or serve these from Render:
 Stencil product page snippet:
 
 ```html
-<link rel="stylesheet" href="https://YOUR-RENDER-APP.onrender.com/security-mirror-widget.css">
+<link rel="stylesheet" href="https://security-mirror-calculator.onrender.com/security-mirror-widget.css">
 <div id="security-mirror-calculator"></div>
-<script src="https://YOUR-RENDER-APP.onrender.com/security-mirror-widget.js"></script>
+<script src="https://security-mirror-calculator.onrender.com/security-mirror-widget.js"></script>
 <script>
   window.SecurityMirrorCalculator.init({
     root: "#security-mirror-calculator",
-    apiBase: "https://YOUR-RENDER-APP.onrender.com",
+    apiBase: "https://security-mirror-calculator.onrender.com",
     type: "frameless_mirror",
     customerGroup: "{{customer.customer_group_name}}",
     hideCustomerField: true
@@ -89,6 +93,8 @@ Stencil product page snippet:
 ```
 
 A ready-to-paste copy also lives at [docs/bigcommerce-frameless-snippet.html](/Users/prateekrana/Documents/BC/docs/bigcommerce-frameless-snippet.html).
+
+Set `type` per BigCommerce product. For example, use `series_3200` on a Series 3200 product page and `kick_plates` on a Kick Plates product page.
 
 ## Customer-type specific links
 
@@ -103,7 +109,7 @@ The widget auto-locks customer group from URL query params and hides the selecto
 
 Examples:
 
-- `https://YOUR-RENDER-APP.onrender.com/demo.html?cg=Contractor`
+- `https://security-mirror-calculator.onrender.com/demo.html?type=kick_plates&cg=Contractor`
 - `https://securitymirror.com/frameless-mirror-special/?cg=House`
 
 ## Option-based image switching (Hostinger)

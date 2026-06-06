@@ -79,10 +79,11 @@
 
     <script src="/security-mirror-widget.js"></script>
     <script>
+      const params = new URLSearchParams(window.location.search);
       window.SecurityMirrorCalculator.init({
         root: "#security-mirror-calculator",
         apiBase: "",
-        type: "frameless_mirror",
+        type: params.get("type") || "frameless_mirror",
         customerGroup: "House",
         hideCustomerField: true
       });

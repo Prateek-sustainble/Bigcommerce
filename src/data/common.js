@@ -85,4 +85,7 @@ export const CUSTOMER_DISCOUNTS = {
     shelves: 0.45,
     kick_plates: 0.45,
   },
+  Richelieu: {
+    convex_and_domes: 0.41,
+  },
 };

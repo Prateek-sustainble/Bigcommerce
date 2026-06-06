@@ -42,23 +42,32 @@
     return option;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
   function optionMarkup(values) {
-    return values.map((value) => `<option value="${String(value)}">${String(value)}</option>`).join("");
+    return values
+      .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+      .join("");
   }
 
   function payload(root, options) {
-    return {
-      type: options.type,
-      customerGroup: qs(root, "[data-sm-field='customerGroup']").value,
-      item: qs(root, "[data-sm-field='item']").value,
-      widthInches: Number(qs(root, "[data-sm-field='widthInches']").value),
-      widthFraction: Number(qs(root, "[data-sm-field='widthFraction']").value),
-      heightInches: Number(qs(root, "[data-sm-field='heightInches']").value),
-      heightFraction: Number(qs(root, "[data-sm-field='heightFraction']").value),
-      edgeWork: qs(root, "[data-sm-field='edgeWork']").value,
-      shatterStop: qs(root, "[data-sm-field='shatterStop']").value,
-      quantity: Number(qs(root, "[data-sm-field='quantity']").value),
-    };
+    const data = { type: options.type };
+    root.querySelectorAll("[data-sm-field]").forEach((field) => {
+      const name = field.dataset.smField;
+      if (!name) return;
+      if (field.type === "number") {
+        data[name] = Number(field.value);
+        return;
+      }
+      data[name] = field.value;
+    });
+    return data;
   }
 
   function normalizeCustomerGroup(value) {
@@ -71,6 +80,8 @@
       special: "Special",
       elite: "Elite",
       platinum: "Platinum",
+      richelieu: "Richelieu",
+      "richelieu / hd supply": "Richelieu",
     };
     return map[normalized] || "";
   }
@@ -104,48 +115,64 @@
     image.src = imageUrl || fallbackImageUrl;
   }
 
+  function renderField(field) {
+    const label = escapeHtml(field.label || field.name);
+    const defaultValue = field.default ?? "";
+    if (field.control === "dimension") {
+      const min = field.min ?? 0;
+      const max = field.max ?? 120;
+      const inchesName = `${field.name}Inches`;
+      const fractionName = `${field.name}Fraction`;
+      return `
+        <div class="sm-dimension-row">
+          <label>${label}</label>
+          <div class="sm-number-pair">
+            <span>Inches</span>
+            <input data-sm-field="${escapeHtml(inchesName)}" type="number" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="1" value="${escapeHtml(field.defaultInches ?? defaultValue ?? 0)}">
+          </div>
+          <div class="sm-number-pair">
+            <span>Fraction</span>
+            <select data-sm-field="${escapeHtml(fractionName)}" data-sm-fraction="true"></select>
+          </div>
+        </div>
+      `;
+    }
+    if (field.control === "number") {
+      return `
+        <div class="sm-row">
+          <label>${label}</label>
+          <input data-sm-field="${escapeHtml(field.name)}" type="number" min="${escapeHtml(field.min ?? 0)}" max="${escapeHtml(field.max ?? "")}" step="${escapeHtml(field.step ?? 1)}" value="${escapeHtml(defaultValue)}">
+        </div>
+      `;
+    }
+    return `
+      <div class="sm-row">
+        <label>${label}</label>
+        <select data-sm-field="${escapeHtml(field.name)}">${optionMarkup(field.options || [])}</select>
+      </div>
+    `;
+  }
+
   function renderShell(root, config, options) {
+    const fields = config.fields || [
+      { name: "item", label: "Finishing", control: "select", options: config.items || [], default: (config.items || [])[0] },
+      { name: "width", label: "Width", control: "dimension", defaultInches: 24, min: 12, max: 96 },
+      { name: "height", label: "Height", control: "dimension", defaultInches: 36, min: 12, max: 96 },
+      { name: "edgeWork", label: "Edge Work", control: "select", options: config.edgeWorks || [], default: (config.edgeWorks || [])[0] },
+      {
+        name: "shatterStop",
+        label: "Shatter Stop",
+        control: "select",
+        options: config.shatterStopOptions || [],
+        default: (config.shatterStopOptions || [])[0],
+      },
+    ];
+    const customerGroups = config.customerGroups || ["House", "Guest", "Contractor", "Special", "Elite", "Platinum"];
     root.className = "sm-calculator";
     root.innerHTML = `
       <div class="sm-calculator__controls">
-        <div class="sm-row">
-          <label>Finishing</label>
-          <select data-sm-field="item">${optionMarkup(config.items)}</select>
-        </div>
-
         <div class="sm-dimensions">
-          <div class="sm-dimension-row">
-            <label>Width</label>
-            <div class="sm-number-pair">
-              <span>Inches</span>
-              <input data-sm-field="widthInches" type="number" min="12" max="96" step="1" value="24">
-            </div>
-            <div class="sm-number-pair">
-              <span>Fraction</span>
-              <select data-sm-field="widthFraction"></select>
-            </div>
-          </div>
-          <div class="sm-dimension-row">
-            <label>Height</label>
-            <div class="sm-number-pair">
-              <span>Inches</span>
-              <input data-sm-field="heightInches" type="number" min="12" max="96" step="1" value="36">
-            </div>
-            <div class="sm-number-pair">
-              <span>Fraction</span>
-              <select data-sm-field="heightFraction"></select>
-            </div>
-          </div>
-        </div>
-
-        <div class="sm-row">
-          <label>Edge Work</label>
-          <select data-sm-field="edgeWork">${optionMarkup(config.edgeWorks)}</select>
-        </div>
-
-        <div class="sm-row">
-          <label>Shatter Stop</label>
-          <select data-sm-field="shatterStop">${optionMarkup(config.shatterStopOptions)}</select>
+          ${fields.map(renderField).join("")}
         </div>
 
         <div class="sm-row sm-row--muted">
@@ -160,14 +187,7 @@
 
         <div class="sm-row" data-sm-row="customerGroup">
           <label>Customer</label>
-          <select data-sm-field="customerGroup">
-            <option>House</option>
-            <option>Guest</option>
-            <option>Contractor</option>
-            <option>Special</option>
-            <option>Elite</option>
-            <option>Platinum</option>
-          </select>
+          <select data-sm-field="customerGroup">${optionMarkup(customerGroups)}</select>
         </div>
 
         <div class="sm-row">
@@ -203,9 +223,13 @@
       </div>
     `;
 
-    for (const [, label] of fractionOptions) {
-      qs(root, "[data-sm-field='widthFraction']").append(createOption(fractionOptions.find((entry) => entry[1] === label)[0], label));
-      qs(root, "[data-sm-field='heightFraction']").append(createOption(fractionOptions.find((entry) => entry[1] === label)[0], label));
+    root.querySelectorAll("[data-sm-fraction='true']").forEach((select) => {
+      for (const [value, label] of fractionOptions) select.append(createOption(value, label));
+    });
+    for (const field of fields) {
+      if (field.control !== "select" || field.default === undefined) continue;
+      const select = qs(root, `[data-sm-field='${field.name}']`);
+      if (select) select.value = String(field.default);
     }
 
     qs(root, "[data-sm-field='customerGroup']").value = options.customerGroup;

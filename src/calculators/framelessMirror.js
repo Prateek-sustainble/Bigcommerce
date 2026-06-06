@@ -1,5 +1,6 @@
 import { CAD_TO_USD, CUSTOMER_DISCOUNTS } from "../data/common.js";
 import { FRAMELESS_MIRROR_CONFIG } from "../data/framelessMirror.js";
+import { STANDARD_CUSTOMER_GROUP_OPTIONS } from "../data/workbookProducts.js";
 
 const FRACTION_LABELS = new Map([
   [0, ""],
@@ -223,6 +224,32 @@ export function getFramelessMirrorPublicConfig() {
   return {
     type: FRAMELESS_MIRROR_CONFIG.key,
     label: FRAMELESS_MIRROR_CONFIG.label,
+    customerGroups: STANDARD_CUSTOMER_GROUP_OPTIONS,
+    fields: [
+      {
+        name: "item",
+        label: "Finishing",
+        control: "select",
+        options: FRAMELESS_MIRROR_CONFIG.items.map((item) => item.label),
+        default: "Clear Mirror 5mm",
+      },
+      { name: "width", label: "Width", control: "dimension", defaultInches: 24, min: 12, max: 96 },
+      { name: "height", label: "Height", control: "dimension", defaultInches: 36, min: 12, max: 96 },
+      {
+        name: "edgeWork",
+        label: "Edge Work",
+        control: "select",
+        options: FRAMELESS_MIRROR_CONFIG.edgeWorks,
+        default: "No",
+      },
+      {
+        name: "shatterStop",
+        label: "Shatter Stop",
+        control: "select",
+        options: FRAMELESS_MIRROR_CONFIG.shatterStopOptions,
+        default: "No",
+      },
+    ],
     items: FRAMELESS_MIRROR_CONFIG.items.map((item) => item.label),
     edgeWorks: FRAMELESS_MIRROR_CONFIG.edgeWorks,
     shatterStopOptions: FRAMELESS_MIRROR_CONFIG.shatterStopOptions,

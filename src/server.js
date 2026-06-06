@@ -4,10 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { addQuoteToBigCommerceCart } from "./bigcommerce.js";
 import { createQuoteToken, verifyQuoteMatchesToken, verifyQuoteToken } from "./quoteToken.js";
-import {
-  calculateFramelessMirrorQuote,
-  getFramelessMirrorPublicConfig,
-} from "./calculators/framelessMirror.js";
+import { calculateQuote, getCalculatorPublicConfig, getSupportedCalculatorTypes } from "./calculators/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.resolve(__dirname, "../public");
@@ -74,14 +71,7 @@ async function readJson(req) {
 }
 
 function quoteForPayload(payload) {
-  if (payload.type && payload.type !== "frameless_mirror") {
-    return {
-      ok: false,
-      status: "unsupported",
-      message: `Unsupported calculator type: ${payload.type}`,
-    };
-  }
-  return calculateFramelessMirrorQuote(payload);
+  return calculateQuote(payload);
 }
 
 function signedQuoteResponse(quote) {
@@ -125,11 +115,16 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/calculator/config") {
     const type = url.searchParams.get("type") || "frameless_mirror";
-    if (type !== "frameless_mirror") {
-      sendJson(req, res, 404, { ok: false, message: `Unsupported calculator type: ${type}` });
+    const config = getCalculatorPublicConfig(type);
+    if (!config) {
+      sendJson(req, res, 404, {
+        ok: false,
+        message: `Unsupported calculator type: ${type}`,
+        supportedTypes: getSupportedCalculatorTypes(),
+      });
       return;
     }
-    sendJson(req, res, 200, { ok: true, config: getFramelessMirrorPublicConfig() });
+    sendJson(req, res, 200, { ok: true, config, supportedTypes: getSupportedCalculatorTypes() });
     return;
   }
 
