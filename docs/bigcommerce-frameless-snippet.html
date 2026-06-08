@@ -1,15 +1,15 @@
 <!-- Security Mirror Frameless Mirror calculator embed -->
 <link rel="stylesheet" href="https://security-mirror-calculator.onrender.com/security-mirror-widget.css">
-<div id="security-mirror-calculator"></div>
+<div id="security-mirror-calculator" data-sm-type="{{product.custom_fields.calculator_type}}"></div>
 <script src="https://security-mirror-calculator.onrender.com/security-mirror-widget.js"></script>
 <script>
   window.SecurityMirrorCalculator.init({
     root: "#security-mirror-calculator",
     apiBase: "https://security-mirror-calculator.onrender.com",
+    // The widget can read the type from data-sm-type or from this value.
     // Change per product: frameless_mirror, cut_glass, shelves, kick_plates,
     // antique, u_guard, corner_guard, j_mould, series_850, series_850_ft,
     // series_3200, series_3200_ft, series_3300, series_4100, convex_domes.
-    type: "frameless_mirror",
     customerGroup: "{{#if customer}}{{customer.customer_group_name}}{{else}}Guest{{/if}}",
     hideCustomerField: true
   });

@@ -347,9 +347,20 @@
 
   async function init(userOptions) {
     const urlCustomerGroup = customerGroupFromUrl();
+    const rootRef = (userOptions || {}).root || defaults.root;
+    const root = typeof rootRef === "string" ? document.querySelector(rootRef) : rootRef;
+    if (!root) return;
+
+    const urlType = new URLSearchParams(window.location.search).get("type");
+    const inferredType =
+      (userOptions || {}).type ||
+      root.dataset.smType ||
+      urlType ||
+      defaults.type;
     const options = {
       ...defaults,
       ...(userOptions || {}),
+      type: inferredType,
       customerGroup: urlCustomerGroup || (userOptions && userOptions.customerGroup) || defaults.customerGroup,
       lockCustomerGroup:
         Boolean(urlCustomerGroup) ||
@@ -360,8 +371,6 @@
         Boolean((userOptions || {}).hideCustomerField) ||
         Boolean((userOptions || {}).lockCustomerGroup),
     };
-    const root = typeof options.root === "string" ? document.querySelector(options.root) : options.root;
-    if (!root) return;
 
     const configResponse = await fetch(`${options.apiBase}/api/calculator/config?type=${options.type}`).then((response) =>
       response.json(),

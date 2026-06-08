@@ -79,13 +79,12 @@ Stencil product page snippet:
 
 ```html
 <link rel="stylesheet" href="https://security-mirror-calculator.onrender.com/security-mirror-widget.css">
-<div id="security-mirror-calculator"></div>
+<div id="security-mirror-calculator" data-sm-type="{{product.custom_fields.calculator_type}}"></div>
 <script src="https://security-mirror-calculator.onrender.com/security-mirror-widget.js"></script>
 <script>
   window.SecurityMirrorCalculator.init({
     root: "#security-mirror-calculator",
     apiBase: "https://security-mirror-calculator.onrender.com",
-    type: "frameless_mirror",
     customerGroup: "{{customer.customer_group_name}}",
     hideCustomerField: true
   });
