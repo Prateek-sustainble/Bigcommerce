@@ -48,8 +48,8 @@ test("quotes workbook fixed tables for shelves, kick plates, and series 3300", (
   });
 
   assert.equal(shelf.price.unitCad, 66.75);
-  assert.equal(shelf3205.price.unitCad, 66.75);
-  assert.equal(shelf3205.sku, "SHELF-855-M-N4SS-CUSTOM");
+  assert.equal(shelf3205.price.unitCad, 106.5);
+  assert.equal(shelf3205.sku, "SHELF-3205-M-N4SS-CUSTOM");
   assert.equal(kickPlate.price.unitCad, 53.33);
   assert.equal(kickPlate.sku, "KICK-18G-CUSTOM");
   assert.equal(series3300.price.unitCad, 311.25);
@@ -606,14 +606,23 @@ test("exposes dynamic field schemas for non-frameless calculators", () => {
 });
 
 test("exposes customer-facing shelf finishes as swatches", () => {
-  const visibleFinishes = [
+  const shelf855Finishes = [
     "18GA Brushed Steel",
     "16GA Brushed Bronze",
     "16GA Brushed Gold",
     "16GA Brushed Gunmetal",
   ];
+  const shelf3205Finishes = [
+    "18GA Brushed Steel",
+    "18GA Black Powder Coat Steel",
+    "18GA White Powder Coat",
+  ];
 
-  for (const type of ["shelves", "series_855", "series_3205"]) {
+  for (const [type, visibleFinishes] of [
+    ["shelves", shelf855Finishes],
+    ["series_855", shelf855Finishes],
+    ["series_3205", shelf3205Finishes],
+  ]) {
     const config = getCalculatorPublicConfig(type);
     const finish = config.fields.find((field) => field.name === "finish");
 
@@ -623,8 +632,31 @@ test("exposes customer-facing shelf finishes as swatches", () => {
       finish.swatches.map((swatch) => swatch.value),
       visibleFinishes,
     );
-    assert.equal(finish.options.includes("18GA Black Powder Coat Steel"), false);
-    assert.equal(finish.options.includes("18GA White Powder Coat"), false);
+    assert.equal(finish.options.includes("16GA Brushed Black"), false);
     assert.match(finish.swatches[0].color, /linear-gradient/);
   }
+});
+
+test("Series 3205 shelf finish swatches drive pricing and SKU", () => {
+  const black = calculateQuote({
+    type: "series_3205",
+    customerGroup: "Guest",
+    lengthInches: 16,
+    depthInches: 5,
+    finish: "18GA Black Powder Coat Steel",
+  });
+  const white = calculateQuote({
+    type: "series_3205",
+    customerGroup: "Guest",
+    lengthInches: 16,
+    depthInches: 5,
+    finish: "18GA White Powder Coat",
+  });
+
+  assert.equal(black.ok, true);
+  assert.equal(black.price.unitCad, 128.96);
+  assert.equal(black.sku, "SHELF-3205-M-PCBL-CUSTOM");
+  assert.equal(white.ok, true);
+  assert.equal(white.price.unitCad, 128.96);
+  assert.equal(white.sku, "SHELF-3205-M-PCWH-CUSTOM");
 });

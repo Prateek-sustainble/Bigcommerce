@@ -313,7 +313,7 @@ function calculateSeries855Shelves(input = {}) {
 }
 
 function calculateSeries3205Shelves(input = {}) {
-  return calculateShelvesForItem("Series 855", input, "series_3205");
+  return calculateShelvesForItem("Series 3205", input, "series_3205");
 }
 
 function calculateKickPlates(input = {}) {
@@ -922,34 +922,46 @@ const KICK_PLATE_SWATCHES = KICK_PLATE_ITEMS.map((item) => ({
   color: KICK_PLATE_SWATCH_COLORS[item.label],
 }));
 
-const SHELF_CUSTOMER_FINISHES = [
+const SHELF_855_FINISHES = [
   "18GA Brushed Steel",
   "16GA Brushed Bronze",
   "16GA Brushed Gold",
   "16GA Brushed Gunmetal",
 ];
 
+const SHELF_3205_FINISHES = [
+  "18GA Brushed Steel",
+  "18GA Black Powder Coat Steel",
+  "18GA White Powder Coat",
+];
+
 const SHELF_SWATCH_COLORS = {
   "18GA Brushed Steel": "linear-gradient(135deg, #707276 0%, #d5d7d6 48%, #8f9290 100%)",
+  "18GA Black Powder Coat Steel": "linear-gradient(135deg, #050505 0%, #272727 48%, #111111 100%)",
+  "18GA White Powder Coat": "linear-gradient(135deg, #e7e7e5 0%, #ffffff 52%, #d7d7d2 100%)",
   "16GA Brushed Bronze": "linear-gradient(135deg, #704534 0%, #bd927a 50%, #dbc0ad 100%)",
   "16GA Brushed Gold": "linear-gradient(135deg, #8b6a23 0%, #d6b44c 50%, #f2dda0 100%)",
   "16GA Brushed Gunmetal": "linear-gradient(135deg, #272723 0%, #595a52 48%, #25251f 100%)",
 };
 
-const SHELF_FINISH_SWATCHES = SHELF_CUSTOMER_FINISHES.map((label) => ({
-  value: label,
-  label,
-  color: SHELF_SWATCH_COLORS[label],
-}));
+function shelfSwatches(finishes) {
+  return finishes.map((label) => ({
+    value: label,
+    label,
+    color: SHELF_SWATCH_COLORS[label],
+  }));
+}
 
-const shelfFinishField = () => ({
-  name: "finish",
-  label: "Frame Finishing",
-  control: "swatch",
-  options: SHELF_CUSTOMER_FINISHES,
-  swatches: SHELF_FINISH_SWATCHES,
-  default: "18GA Brushed Steel",
-});
+function shelfFinishField(finishes = SHELF_855_FINISHES) {
+  return {
+    name: "finish",
+    label: "Frame Finishing",
+    control: "swatch",
+    options: finishes,
+    swatches: shelfSwatches(finishes),
+    default: finishes[0],
+  };
+}
 
 const QUARTER_FRACTION_OPTIONS = [
   ["0", "0"],
@@ -1548,7 +1560,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      shelfFinishField(),
+      shelfFinishField(SHELF_3205_FINISHES),
     ],
   },
   kick_plates: {
