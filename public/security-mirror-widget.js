@@ -111,7 +111,11 @@
   }
 
   function payload(root, options) {
-    const data = { type: options.type, customerId: options.customerId ?? null };
+    const data = {
+      type: options.type,
+      customerId: options.customerId ?? null,
+      customerGroup: options.customerGroup || "Guest",
+    };
     root.querySelectorAll("[data-sm-field]").forEach((field) => {
       const name = field.dataset.smField;
       if (!name) return;
@@ -168,12 +172,13 @@
     return Number.isFinite(value) ? value : null;
   }
 
-  function usesGuestPricing(customerGroup) {
-    return (normalizeCustomerGroup(customerGroup) || "Guest") === "Guest";
+  function hasCustomerId(customerId) {
+    const normalized = String(customerId ?? "").trim();
+    return Boolean(normalized) && normalized !== "0" && normalized !== "null" && normalized !== "undefined";
   }
 
   function requiresContactRequest(options) {
-    return !options.customerId || usesGuestPricing(options.customerGroup);
+    return !hasCustomerId(options.customerId);
   }
 
   async function requestJson(url, body) {

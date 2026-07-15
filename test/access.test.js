@@ -9,8 +9,8 @@ test("guest pricing applies to missing and Guest customer groups", () => {
   assert.equal(usesGuestPricing("House"), false);
 });
 
-test("cart add requires a real customer outside Guest pricing", () => {
+test("cart add requires only a real logged-in customer", () => {
   assert.equal(canAddCalculatedItemToCart({ customerId: null, customerGroup: "House" }), false);
-  assert.equal(canAddCalculatedItemToCart({ customerId: 123, customerGroup: "Guest" }), false);
+  assert.equal(canAddCalculatedItemToCart({ customerId: 123, customerGroup: "Guest" }), true);
   assert.equal(canAddCalculatedItemToCart({ customerId: 123, customerGroup: "House" }), true);
 });

@@ -266,8 +266,8 @@ async function handleApi(req, res, url) {
     if (!canAddCalculatedItemToCart({ customerId: payload.customerId, customerGroup: quote.customerGroup })) {
       sendJson(req, res, 403, {
         ok: false,
-        status: "contact_request_required",
-        message: "Guest-priced calculators cannot be added to cart. Please submit the contact form.",
+        status: "login_required",
+        message: "Please log in to add this calculated item to cart.",
         quote: signedQuoteResponse(quote),
       });
       return;
