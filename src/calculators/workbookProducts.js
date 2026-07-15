@@ -68,11 +68,39 @@ function fixedPrice(tableName, dimensions) {
   )?.price;
 }
 
+// Hostinger uses product-facing filenames rather than the calculator type names.
+const DATASHEET_FILE_NAMES = {
+  CUT_GLASS: "Datasheet_Cut-Glass.pdf",
+  SERIES_850: "Datasheet_850.pdf",
+  SERIES_850_FT: "Datasheet_850FT.pdf",
+  SERIES_855: "Datasheet_855-Steel-Shelf.pdf",
+  SERIES_3205: "Datasheet_3205-Steel-Shelf.pdf",
+  SERIES_3200: "Datasheet_3200.pdf",
+  SERIES_3200_FT: "Datasheet_3200FT.pdf",
+  SERIES_3300: "Datasheet_3300-Frameless-Mirror.pdf",
+  U_GUARD: "Datasheet_U-Guard.pdf",
+  U_GUARDS: "Datasheet_U-Guard.pdf",
+  KICK_PLATES: "Datasheet_Kick-Plate.pdf",
+  J_MOULD: "Datasheet_J-Mould.pdf",
+  FRAMLESS_MIRROR: "Datasheet_Frameless-Mirror.pdf",
+  CORNER_GUARD: "Datasheet_Corner-Guard.pdf",
+  CORNER_GUARDS: "Datasheet_Corner-Guard.pdf",
+  SHELVES: "Datasheet_855-Steel-Shelf.pdf",
+  STEEL_BACK_EXTERIOR_ACRYLIC_CONVEX_MIRROR: "STEEL_BACK_EXTERIOR_ACRYLIC_CONVEX_MIRROR.pdf",
+  QUARTER_HEMISPHERIC_DOME: "QUARTER_HEMISPHERIC_DOME.pdf",
+  INDOOR_ACRYLIC_CONVEX_MIRROR: "INDOOR_ACRYLIC_CONVEX_MIRROR.pdf",
+  HALF_HEMISPHERIC_DOME: "HALF_HEMISPHERIC_DOME.pdf",
+  FULL_HEMISPHERIC_DOME: "FULL_HEMISPHERIC_DOME.pdf",
+  EXTERIOR_ACRYLIC_CONVEX_MIRROR: "EXTERIOR_ACRYLIC_CONVEX_MIRROR.pdf",
+};
+
 function datasheets(name) {
-  const file = slug(name, "_", "upper");
+  const key = slug(name, "_", "upper");
+  const englishFile = DATASHEET_FILE_NAMES[key] || `${key}.pdf`;
+  const frenchFile = englishFile.replace(/\.pdf$/i, "_FR.pdf");
   return {
-    en: `${DATASHEET_BASE_URL}/${file}.pdf`,
-    fr: `${DATASHEET_FR_BASE_URL}/${file}_FR.pdf`,
+    en: `${DATASHEET_BASE_URL}/${englishFile}`,
+    fr: `${DATASHEET_FR_BASE_URL}/${frenchFile}`,
   };
 }
 
@@ -239,7 +267,7 @@ function calculateShelvesForItem(itemLabel, input = {}, type = "shelves") {
     },
     assetPrefix: "SHELVES",
     assetValue: `${item.label}_${finish.label}`,
-    datasheetName: "SHELVES",
+    datasheetName: item.label,
   });
 }
 
