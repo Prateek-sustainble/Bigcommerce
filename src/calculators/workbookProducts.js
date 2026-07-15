@@ -702,8 +702,8 @@ function series850Config() {
   };
 }
 
-function series3200Config() {
-  const config = catalogConfig("series_3200");
+function series3200Config(type = "series_3200") {
+  const config = catalogConfig(type);
   const temperedSizeField = {
     name: "temperedSize",
     label: "Size",
@@ -1090,7 +1090,7 @@ function calculateCatalogQuote(type, input = {}) {
   if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
   if (type === "series_3200") return calculateSeries3200CatalogQuote(catalog, input);
   if (type === "series_3200_ft") {
-    return calculateAdjustedCatalogQuote(type, catalog, input);
+    return calculateSeries3200FixedTiltCatalogQuote(catalog, input);
   }
   const candidate = catalog.rows.find((row) => {
     if (type === "convex_domes" && input.itemCode) return valuesEqual(row.options.itemCode, input.itemCode, "itemCode");
@@ -1242,10 +1242,22 @@ const SERIES_3200_FRAME_CODES = {
   "Powder Coat White Frame": "PCWH",
 };
 
+const SERIES_3200_FT_FRAME_CODES = {
+  "Brushed Stainless Steel Fixed Tilt Frame": "N4SS",
+  "Powder Coat Black Stainless Steel Fixed Tilt Frame": "PCBL",
+  "Powder Coat White Stainless Steel Fixed Tilt Frame": "PCWH",
+};
+
 const SERIES_3200_FRAME_SURCHARGES = {
   "Brushed Stainless Frame": 0,
   "Powder Coat Black Frame": 0.4,
   "Powder Coat White Frame": 0.4,
+};
+
+const SERIES_3200_FT_FRAME_SURCHARGES = {
+  "Brushed Stainless Steel Fixed Tilt Frame": 0,
+  "Powder Coat Black Stainless Steel Fixed Tilt Frame": 0.4,
+  "Powder Coat White Stainless Steel Fixed Tilt Frame": 0.4,
 };
 
 const SERIES_3200_GLAZING = {
@@ -1338,22 +1350,48 @@ function series3200TemperedSizeAllowed(width, height) {
   return SERIES_3200_TEMPERED_SIZES.some((size) => size.width === width && size.height === height);
 }
 
-function series3200FixedBasePrice(catalog, width, height) {
+function series3200FixedBasePrice(catalog, width, height, type = "series_3200") {
+  const baseFrame = type === "series_3200_ft"
+    ? "Brushed Stainless Steel Fixed Tilt Frame"
+    : "Brushed Stainless Frame";
   const candidate = catalog.rows.find((row) =>
     row.options.width === width &&
     row.options.height === height &&
     valuesEqual(row.options.glazing, "5mm Standard", "glazing") &&
-    valuesEqual(row.options.frameFinishing, "Brushed Stainless Frame", "frameFinishing") &&
+    valuesEqual(row.options.frameFinishing, baseFrame, "frameFinishing") &&
     valuesEqual(row.options.shelf, "No Shelf", "shelf") &&
     valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
   );
   return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
 }
 
-function calculateSeries3200CatalogQuote(catalog, input = {}) {
-  const frameFinishing = Object.hasOwn(SERIES_3200_FRAME_CODES, input.frameFinishing)
+function calculateSeries3200FixedTiltCatalogQuote(catalog, input = {}) {
+  const { width, height } = resolveSeries3200Dimensions(input);
+  const exactInput = { ...input, width, height };
+  const exactQuote = calculateAdjustedCatalogQuote("series_3200_ft", catalog, exactInput);
+  if (exactQuote.ok) {
+    const isTempered = normalizedOption(exactQuote.selections.glazing) === "6mm tempered";
+    return {
+      ...exactQuote,
+      selections: {
+        ...exactQuote.selections,
+        ...(isTempered ? { temperedSize: `${width}x${height}` } : {}),
+      },
+    };
+  }
+  return calculateSeries3200CatalogQuote(catalog, input, "series_3200_ft");
+}
+
+function calculateSeries3200CatalogQuote(catalog, input = {}, type = "series_3200") {
+  const isFixedTilt = type === "series_3200_ft";
+  const frameCodes = isFixedTilt ? SERIES_3200_FT_FRAME_CODES : SERIES_3200_FRAME_CODES;
+  const frameSurcharges = isFixedTilt ? SERIES_3200_FT_FRAME_SURCHARGES : SERIES_3200_FRAME_SURCHARGES;
+  const defaultFrame = isFixedTilt ? "Brushed Stainless Steel Fixed Tilt Frame" : "Brushed Stainless Frame";
+  const seriesLabel = isFixedTilt ? "3200FT Series" : "3200 Series";
+  const skuPrefix = isFixedTilt ? "M-3200FT" : "M-3200";
+  const frameFinishing = Object.hasOwn(frameCodes, input.frameFinishing)
     ? input.frameFinishing
-    : "Brushed Stainless Frame";
+    : defaultFrame;
   const glazing = resolveSeries850MapOption(SERIES_3200_GLAZING, input.glazing, "5mm Standard");
   const shelf = resolveSeries3200Shelf(input.shelf);
   const packaging = resolveSeries850Packaging(input.packaging);
@@ -1372,31 +1410,31 @@ function calculateSeries3200CatalogQuote(catalog, input = {}) {
   if (normalizedWidth > 48 && normalizedHeight > 48) return unavailable("Size outside min/max allowed");
 
   const squareFeet = (normalizedWidth * normalizedHeight) / 144;
-  const fixedBaseCad = series3200FixedBasePrice(catalog, width, height);
+  const fixedBaseCad = series3200FixedBasePrice(catalog, width, height, type);
   const normalBaseCad = 100 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 90);
   const isOversizeBothSides = normalizedWidth > 36 && normalizedHeight > 36;
   const oversizeBaseCad = squareFeet * 52.5;
   const baseListCad = isOversizeBothSides ? oversizeBaseCad : fixedBaseCad || normalBaseCad;
-  const frameSurchargeRate = SERIES_3200_FRAME_SURCHARGES[frameFinishing] ?? 0;
+  const frameSurchargeRate = frameSurcharges[frameFinishing] ?? 0;
   const frameSurchargeBaseCad = fixedBaseCad || normalBaseCad;
   const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
   const glazingCad = squareFeet * glazing.psfAdd;
   const shelfCad = normalizedWidth * shelf.multiplier;
   const packagingCad = packaging.addCad;
   const listCad = baseListCad + frameSurchargeCad + glazingCad + shelfCad + packagingCad;
-  const price = priceBlock(listCad, input, "series_3200");
-  const imageConfig = CATALOG_IMAGE_FIELDS.series_3200;
-  const frameCode = SERIES_3200_FRAME_CODES[frameFinishing] || "N4SS";
+  const price = priceBlock(listCad, input, type);
+  const imageConfig = CATALOG_IMAGE_FIELDS[type];
+  const frameCode = frameCodes[frameFinishing] || "N4SS";
   const widthLabel = formatDimension(input.widthInches ?? width, input.widthFraction);
   const heightLabel = formatDimension(input.heightInches ?? height, input.heightFraction);
   const skuSize = fixedBaseCad ? `${widthLabel}X${heightLabel}` : "CUSTOM";
-  const sku = `M-3200-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
-  const description = `3200 Series ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
+  const sku = `${skuPrefix}-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
+  const description = `${seriesLabel} ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
 
   return {
     ok: true,
     status: "quoted",
-    type: "series_3200",
+    type,
     customerId: input.customerId ?? null,
     customerGroup: price.customerGroup,
     discountMultiplier: price.discountMultiplier,
@@ -1411,7 +1449,7 @@ function calculateSeries3200CatalogQuote(catalog, input = {}) {
       quantity: price.quantity,
     },
     calculation: {
-      source: "workbook_2026_series_3200_formula",
+      source: isFixedTilt ? "workbook_2026_series_3200ft_formula" : "workbook_2026_series_3200_formula",
       normalizedWidth,
       normalizedHeight,
       squareFeet: roundCurrency(squareFeet),
@@ -1431,10 +1469,10 @@ function calculateSeries3200CatalogQuote(catalog, input = {}) {
     sku,
     description,
     assets: productAssets({
-      type: "series_3200",
+      type,
       prefix: imageConfig.prefix,
       value: frameFinishing,
-      datasheetName: "series_3200",
+      datasheetName: type,
     }),
   };
 }
@@ -1637,7 +1675,8 @@ const CUSTOM_CALCULATORS = {
 
 export function getWorkbookPublicConfig(type) {
   if (type === "series_850") return series850Config();
-  if (type === "series_3200") return series3200Config();
+  if (type === "series_3200") return series3200Config("series_3200");
+  if (type === "series_3200_ft") return series3200Config("series_3200_ft");
   if (SKU_CATALOG[type] && type !== "series_3300") return catalogConfig(type);
   const config = CUSTOM_CONFIGS[type] || (type === "series_3300" ? {
     label: "Series 3300 Stainless Steel Mirror",
