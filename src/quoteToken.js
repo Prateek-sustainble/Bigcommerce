@@ -21,6 +21,7 @@ function nowSeconds() {
 function fingerprint(quote) {
   const stable = {
     type: quote.type,
+    customerId: quote.customerId ?? null,
     customerGroup: quote.customerGroup,
     selections: quote.selections,
     price: quote.price,
@@ -39,6 +40,7 @@ export function createQuoteToken(quote, secret, ttlSeconds = DEFAULT_TTL_SECONDS
     exp: issuedAt + ttlSeconds,
     fp: fingerprint(quote),
     type: quote.type,
+    customerId: quote.customerId ?? null,
     customerGroup: quote.customerGroup,
     selections: quote.selections,
     price: quote.price,

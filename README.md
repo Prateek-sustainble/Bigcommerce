@@ -14,7 +14,7 @@ This implements the Security Mirror pricing calculators from `FINAL EXCEL SM Fin
 
 Supported calculator types:
 
-`frameless_mirror`, `cut_glass`, `shelves`, `kick_plates`, `antique`, `u_guard`, `corner_guard`, `j_mould`, `series_850`, `series_850_ft`, `series_3200`, `series_3200_ft`, `series_3300`, `series_4100`, `convex_domes`.
+`frameless_mirror`, `cut_glass`, `shelves`, `series_855`, `series_3205`, `kick_plates`, `antique`, `u_guard`, `corner_guard`, `j_mould`, `series_850`, `series_850_ft`, `series_3200`, `series_3200_ft`, `series_3300`, `series_4100`, `convex_domes`.
 
 ## Run Locally
 
@@ -68,6 +68,8 @@ This returns the old Calculator Studio screenshot result:
 
 `/api/cart/add` validates `quoteToken` and rejects tampered quote payloads before calling BigCommerce.
 
+Customer-group pricing is driven by the calculator backend, not by BigCommerce product price lists. The storefront only supplies the logged-in customer context (`customer_id` and `customer_group_name`), and the widget locks the group field so the customer sees the correct tier without changing the theme layout.
+
 ## BigCommerce Embed
 
 Upload or serve these from Render:
@@ -79,7 +81,7 @@ Stencil product page snippet:
 
 ```html
 <link rel="stylesheet" href="https://security-mirror-calculator.onrender.com/security-mirror-widget.css">
-<div id="security-mirror-calculator" data-sm-type="{{product.custom_fields.calculator_type}}"></div>
+<div id="security-mirror-calculator" data-sm-type="frameless_mirror"></div>
 <script src="https://security-mirror-calculator.onrender.com/security-mirror-widget.js"></script>
 <script>
   window.SecurityMirrorCalculator.init({
@@ -93,7 +95,17 @@ Stencil product page snippet:
 
 A ready-to-paste copy also lives at [docs/bigcommerce-frameless-snippet.html](/Users/prateekrana/Documents/BC/docs/bigcommerce-frameless-snippet.html).
 
-Set `type` per BigCommerce product. For example, use `series_3200` on a Series 3200 product page and `kick_plates` on a Kick Plates product page.
+Duplicate the template per product family and change only `data-sm-type`. For example, use `series_3200` on a Series 3200 product page and `kick_plates` on a Kick Plates product page.
+
+Important: do not add the next product family inside the same shared `single-details.html` block if that file is used by multiple products. Create a sibling custom product template for the next family, paste the same embed there, and change only `data-sm-type`.
+
+For shelf products, use `sm_type="series_855"` for [Series 855 Steel Shelves](https://securitymirror.com/series-855-steel-shelves-sp2h/) and `sm_type="series_3205"` for [Series 3205 Steel Shelves](https://securitymirror.com/copy-of-series-3205-steel-shelves/). Both calculators reuse the same shelf pricing formula; they just start on different fixed shelf series and no longer show the series dropdown.
+
+### Creating and assigning product-family templates
+
+In your BigCommerce theme, create custom product templates under `templates/pages/custom/product/` and start each one by copying `templates/pages/product.html` from the base theme. Give each file a clear name like `frameless-mirror.html` or `kick-plates.html`, then place the calculator embed in that file with the matching `data-sm-type`.
+
+Assign the template in BigCommerce by editing the product and choosing the file in `Other Details` -> `Template Layout File`. If you want to assign many products at once, use the Storefront Custom Template Associations API with `entity_type: "product"` and the same `file_name` as the template file.
 
 ## Customer-type specific links
 

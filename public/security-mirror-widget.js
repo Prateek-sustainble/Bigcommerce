@@ -4,7 +4,10 @@
     apiBase: "",
     type: "frameless_mirror",
     customerGroup: "House",
+    customerId: null,
+    defaultItem: "",
     hideCustomerField: false,
+    hideItemField: false,
     lockCustomerGroup: false,
   };
 
@@ -57,7 +60,7 @@
   }
 
   function payload(root, options) {
-    const data = { type: options.type };
+    const data = { type: options.type, customerId: options.customerId ?? null };
     root.querySelectorAll("[data-sm-field]").forEach((field) => {
       const name = field.dataset.smField;
       if (!name) return;
@@ -93,6 +96,24 @@
       normalizeCustomerGroup(params.get("customer_group")) ||
       normalizeCustomerGroup(params.get("cg"))
     );
+  }
+
+  function allowUrlOverrides() {
+    const host = window.location.hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  }
+
+  function customerGroupFromRoot(root) {
+    if (!root) return "";
+    return normalizeCustomerGroup(root.dataset.smCustomerGroup || "");
+  }
+
+  function customerIdFromRoot(root) {
+    if (!root) return null;
+    const rawValue = root.dataset.smCustomerId;
+    if (!rawValue) return null;
+    const value = Number(rawValue);
+    return Number.isFinite(value) ? value : null;
   }
 
   async function requestJson(url, body) {
@@ -232,12 +253,23 @@
       if (select) select.value = String(field.default);
     }
 
+    if (options.defaultItem) {
+      const itemSelect = qs(root, "[data-sm-field='item']");
+      if (itemSelect) itemSelect.value = options.defaultItem;
+    }
+
     qs(root, "[data-sm-field='customerGroup']").value = options.customerGroup;
     if (options.hideCustomerField || options.lockCustomerGroup) {
       qs(root, "[data-sm-row='customerGroup']").classList.add("sm-row--hidden");
     }
     if (options.lockCustomerGroup) {
       qs(root, "[data-sm-field='customerGroup']").setAttribute("disabled", "disabled");
+    }
+    if (options.hideItemField) {
+      const itemRow = qs(root, "[data-sm-field='item']")?.closest(".sm-row, .sm-dimension-row");
+      if (itemRow) itemRow.classList.add("sm-row--hidden");
+      const itemSelect = qs(root, "[data-sm-field='item']");
+      if (itemSelect) itemSelect.setAttribute("disabled", "disabled");
     }
   }
 
@@ -273,40 +305,63 @@
     const media = qs(root, "[data-sm-output='gallery']");
     if (!media) return;
 
-    const images = gallery.length ? gallery : [fallbackImageUrl];
+    const images = (gallery || []).filter(Boolean);
+    if (images.length < 2) {
+      media.hidden = true;
+      media.innerHTML = "";
+      root.dataset.smGallery = "[]";
+      root.dataset.smActiveGalleryUrl = "";
+      return;
+    }
+
+    media.hidden = false;
     root.dataset.smGallery = JSON.stringify(images);
-    root.dataset.smActiveGalleryIndex = "0";
+    root.dataset.smActiveGalleryUrl = images[0];
     media.innerHTML = images
       .map(
         (url, index) => `
-          <button class="sm-gallery__button${index === 0 ? " is-active" : ""}" type="button" data-sm-gallery-index="${index}" aria-label="View image ${index + 1}">
-            <img src="${url}" alt="">
+          <button class="sm-gallery__button${index === 0 ? " is-active" : ""}" type="button" data-sm-gallery-url="${escapeHtml(url)}" aria-label="View image ${index + 1}">
+            <img src="${escapeHtml(url)}" alt="">
           </button>
         `,
       )
       .join("");
     media.querySelectorAll("img").forEach((image) => {
+      const button = image.closest("button[data-sm-gallery-url]");
       image.onerror = () => {
         image.onerror = null;
-        image.src = fallbackImageUrl;
+        const wasActive = button?.classList.contains("is-active");
+        const buttonUrl = button?.dataset.smGalleryUrl || "";
+        button?.remove();
+
+        const remainingButtons = media.querySelectorAll("button[data-sm-gallery-url]");
+        if (!remainingButtons.length) {
+          media.hidden = true;
+          root.dataset.smGallery = "[]";
+          root.dataset.smActiveGalleryUrl = "";
+          return;
+        }
+
+        if (wasActive || root.dataset.smActiveGalleryUrl === buttonUrl) {
+          const nextButton = remainingButtons[0];
+          activateGalleryImage(root, nextButton.dataset.smGalleryUrl, fallbackImageUrl);
+        }
       };
     });
   }
 
-  function activateGalleryImage(root, index) {
-    const gallery = JSON.parse(root.dataset.smGallery || "[]");
-    const imageUrl = gallery[index];
+  function activateGalleryImage(root, imageUrl, fallbackImageUrl) {
     if (!imageUrl) return;
 
     const image = qs(root, "[data-sm-output='image']");
     const thumb = qs(root, "[data-sm-output='thumb']");
-    const fallbackImageUrl = root.dataset.smFallbackImageUrl || "/assets/frameless-mirror-placeholder.svg";
-    setImageSource(image, imageUrl, fallbackImageUrl);
-    setImageSource(thumb, imageUrl, fallbackImageUrl);
-    root.dataset.smActiveGalleryIndex = String(index);
+    const resolvedFallback = fallbackImageUrl || root.dataset.smFallbackImageUrl || "/assets/frameless-mirror-placeholder.svg";
+    setImageSource(image, imageUrl, resolvedFallback);
+    setImageSource(thumb, imageUrl, resolvedFallback);
+    root.dataset.smActiveGalleryUrl = imageUrl;
 
-    root.querySelectorAll("[data-sm-gallery-index]").forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.smGalleryIndex === String(index));
+    root.querySelectorAll("button[data-sm-gallery-url]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.smGalleryUrl === imageUrl);
     });
   }
 
@@ -346,12 +401,15 @@
   }
 
   async function init(userOptions) {
-    const urlCustomerGroup = customerGroupFromUrl();
+    const urlOverridesAllowed = allowUrlOverrides();
+    const urlCustomerGroup = urlOverridesAllowed ? customerGroupFromUrl() : "";
     const rootRef = (userOptions || {}).root || defaults.root;
     const root = typeof rootRef === "string" ? document.querySelector(rootRef) : rootRef;
     if (!root) return;
+    const rootCustomerGroup = customerGroupFromRoot(root);
+    const rootCustomerId = customerIdFromRoot(root);
 
-    const urlType = new URLSearchParams(window.location.search).get("type");
+    const urlType = urlOverridesAllowed ? new URLSearchParams(window.location.search).get("type") : null;
     const inferredType =
       (userOptions || {}).type ||
       root.dataset.smType ||
@@ -361,13 +419,18 @@
       ...defaults,
       ...(userOptions || {}),
       type: inferredType,
-      customerGroup: urlCustomerGroup || (userOptions && userOptions.customerGroup) || defaults.customerGroup,
+      customerId: (userOptions || {}).customerId ?? rootCustomerId ?? null,
+      defaultItem: (userOptions || {}).defaultItem || root.dataset.smDefaultItem || defaults.defaultItem,
+      customerGroup: urlCustomerGroup || (userOptions && userOptions.customerGroup) || rootCustomerGroup || defaults.customerGroup,
       lockCustomerGroup:
         Boolean(urlCustomerGroup) ||
+        Boolean(rootCustomerGroup) ||
         Boolean((userOptions || {}).lockCustomerGroup) ||
         Boolean((userOptions || {}).hideCustomerField),
+      hideItemField: Boolean((userOptions || {}).hideItemField) || root.dataset.smHideItemField === "true",
       hideCustomerField:
         Boolean(urlCustomerGroup) ||
+        Boolean(rootCustomerGroup) ||
         Boolean((userOptions || {}).hideCustomerField) ||
         Boolean((userOptions || {}).lockCustomerGroup),
     };
@@ -379,9 +442,9 @@
     root.addEventListener("input", () => updateQuote(root, options));
     root.addEventListener("change", () => updateQuote(root, options));
     root.addEventListener("click", (event) => {
-      const button = event.target.closest("button[data-sm-gallery-index]");
+      const button = event.target.closest("button[data-sm-gallery-url]");
       if (!button || !root.contains(button)) return;
-      activateGalleryImage(root, Number(button.dataset.smGalleryIndex));
+      activateGalleryImage(root, button.dataset.smGalleryUrl, root.dataset.smFallbackImageUrl);
     });
     qs(root, "[data-sm-action='add']").addEventListener("click", () => addToCart(root, options));
     await updateQuote(root, options);

@@ -1,4 +1,5 @@
 import { SKU_CATALOG } from "../data/skuCatalog.js";
+import { WORKBOOK_IMAGE_ASSETS } from "../data/workbookImageAssets.js";
 import {
   ANTIQUE_ITEMS,
   ANTIQUE_THICKNESS,
@@ -75,14 +76,36 @@ function datasheets(name) {
   };
 }
 
-function productAssets({ prefix, value, datasheetName }) {
+function productAssets({ type, prefix, value, datasheetName }) {
+  const assetSet = WORKBOOK_IMAGE_ASSETS[type] || WORKBOOK_IMAGE_ASSETS[prefixToType(prefix)];
   return imageSet({
     prefix,
     value,
     baseUrl: IMAGE_BASE_URL,
-    fallbackImageUrl: FALLBACK_IMAGE_URL,
+    fallbackImageUrl: assetSet?.fallbackImageUrl || FALLBACK_IMAGE_URL,
     datasheets: datasheets(datasheetName || value),
+    primaryImageUrl: assetSet?.primaryImageUrl,
+    galleryUrls: assetSet?.galleryUrls,
   });
+}
+
+function prefixToType(prefix) {
+  const lookup = {
+    SERIES_850: "series_850",
+    SERIES_850FT: "series_850_ft",
+    SERIES_3200: "series_3200",
+    SERIES_3200FT: "series_3200_ft",
+    SERIES_3300: "series_3300",
+    SERIES_4100: "series_4100",
+    ANTIQUE: "antique",
+    CUT_GLASS: "cut_glass",
+    U_GUARDS: "u_guard",
+    CORNER_GUARDS: "corner_guard",
+    J_MOULD: "j_mould",
+    SHELVES: "shelves",
+    KICK_PLATE: "kick_plates",
+  };
+  return lookup[prefix] || prefix;
 }
 
 function quoteResponse({
@@ -103,6 +126,7 @@ function quoteResponse({
     ok: true,
     status: "quoted",
     type,
+    customerId: input.customerId ?? null,
     customerGroup: price.customerGroup,
     discountMultiplier: price.discountMultiplier,
     selections: { ...selections, quantity: price.quantity },
@@ -111,6 +135,7 @@ function quoteResponse({
     sku,
     description,
     assets: productAssets({
+      type,
       prefix: assetPrefix,
       value: assetValue,
       datasheetName,
@@ -179,8 +204,8 @@ function calculateCutGlass(input = {}) {
   });
 }
 
-function calculateShelves(input = {}) {
-  const item = findByLabel(SHELF_ITEMS, input.item);
+function calculateShelvesForItem(itemLabel, input = {}, type = "shelves") {
+  const item = findByLabel(SHELF_ITEMS, itemLabel || input.item);
   const finish = findByLabel(SHELF_FINISHES, input.finish);
   const length = dimensionValue(input, "length");
   const depth = dimensionValue(input, "depth");
@@ -195,7 +220,8 @@ function calculateShelves(input = {}) {
 
   return quoteResponse({
     input,
-    type: "shelves",
+    type,
+    familyKey: "shelves",
     unitListCad: listCad,
     sku: `SHELF-${item.abbreviation}-${finish.abbreviation}-CUSTOM`,
     description: `SHELF-Series-Item ${item.label}-Length${formatDimension(input.lengthInches ?? length, input.lengthFraction)}xDepth${formatDimension(input.depthInches ?? depth, input.depthFraction)}- ${finish.label}`,
@@ -212,6 +238,18 @@ function calculateShelves(input = {}) {
     assetValue: `${item.label}_${finish.label}`,
     datasheetName: "SHELVES",
   });
+}
+
+function calculateShelves(input = {}) {
+  return calculateShelvesForItem(input.item, input, "shelves");
+}
+
+function calculateSeries855Shelves(input = {}) {
+  return calculateShelvesForItem("Series 855", input, "series_855");
+}
+
+function calculateSeries3205Shelves(input = {}) {
+  return calculateShelvesForItem("Series 3205", input, "series_3205");
 }
 
 function calculateKickPlates(input = {}) {
@@ -565,6 +603,7 @@ function calculateCatalogQuote(type, input = {}) {
     ok: true,
     status: "quoted",
     type,
+    customerId: input.customerId ?? null,
     customerGroup: price.customerGroup,
     discountMultiplier: price.discountMultiplier,
     selections: { ...candidate.options, quantity: price.quantity },
@@ -578,6 +617,7 @@ function calculateCatalogQuote(type, input = {}) {
     sku: candidate.sku,
     description: candidate.description,
     assets: productAssets({
+      type,
       prefix: imageConfig.prefix,
       value: assetValue,
       datasheetName: type === "convex_domes" ? candidate.options.category : type,
@@ -599,6 +639,22 @@ const CUSTOM_CONFIGS = {
     label: "Shelves",
     fields: [
       { name: "item", label: "Series", control: "select", options: SHELF_ITEMS.map((item) => item.label), default: "Series 855" },
+      { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
+      { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
+      { name: "finish", label: "Finish", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+    ],
+  },
+  series_855: {
+    label: "Series 855 Steel Shelves",
+    fields: [
+      { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
+      { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
+      { name: "finish", label: "Finish", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+    ],
+  },
+  series_3205: {
+    label: "Series 3205 Steel Shelves",
+    fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
       { name: "finish", label: "Finish", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
@@ -666,6 +722,8 @@ const CUSTOM_CONFIGS = {
 const CUSTOM_CALCULATORS = {
   cut_glass: calculateCutGlass,
   shelves: calculateShelves,
+  series_855: calculateSeries855Shelves,
+  series_3205: calculateSeries3205Shelves,
   kick_plates: calculateKickPlates,
   series_3300: calculateSeries3300,
   antique: calculateAntique,

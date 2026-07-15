@@ -1,6 +1,8 @@
 import { CAD_TO_USD, CUSTOMER_DISCOUNTS } from "../data/common.js";
 import { FRAMELESS_MIRROR_CONFIG } from "../data/framelessMirror.js";
+import { WORKBOOK_IMAGE_ASSETS } from "../data/workbookImageAssets.js";
 import { STANDARD_CUSTOMER_GROUP_OPTIONS } from "../data/workbookProducts.js";
+import { normalizeCustomerGroupName } from "./helpers.js";
 
 const FRACTION_LABELS = new Map([
   [0, ""],
@@ -63,14 +65,24 @@ function findItem(label) {
 }
 
 function customerMultiplier(customerGroup) {
-  const normalizedGroup = customerGroup && CUSTOMER_DISCOUNTS[customerGroup] ? customerGroup : "Guest";
+  const normalizedGroup = normalizeCustomerGroupName(customerGroup);
+  const resolvedGroup = normalizedGroup && CUSTOMER_DISCOUNTS[normalizedGroup] ? normalizedGroup : "Guest";
   return {
-    group: normalizedGroup,
-    multiplier: CUSTOMER_DISCOUNTS[normalizedGroup].frameless_mirror,
+    group: resolvedGroup,
+    multiplier: CUSTOMER_DISCOUNTS[resolvedGroup].frameless_mirror,
   };
 }
 
 function imageUrls(itemLabel) {
+  const workbookImages = WORKBOOK_IMAGE_ASSETS.frameless_mirror;
+  if (workbookImages) {
+    return {
+      primaryImageUrl: workbookImages.primaryImageUrl,
+      gallery: workbookImages.galleryUrls,
+      fallbackImageUrl: workbookImages.fallbackImageUrl,
+    };
+  }
+
   const baseUrl = FRAMELESS_MIRROR_CONFIG.images.baseUrl;
   const lower = slugifyForImage(itemLabel, "lower");
   const upper = slugifyForImage(itemLabel, "upper");
@@ -78,6 +90,7 @@ function imageUrls(itemLabel) {
   return {
     primaryImageUrl: `${baseUrl}/FRAMELSS_MIRROR_${lower}.png`,
     gallery: [1, 2, 3, 4].map((index) => `${baseUrl}/FRAMELSS_MIRROR_${upper}-${index}.png`),
+    fallbackImageUrl: FRAMELESS_MIRROR_CONFIG.fallbackImageUrl,
   };
 }
 
@@ -176,6 +189,7 @@ export function calculateFramelessMirrorQuote(input = {}) {
     ok: true,
     status: "quoted",
     type: FRAMELESS_MIRROR_CONFIG.key,
+    customerId: input.customerId ?? null,
     customerGroup: group,
     discountMultiplier: multiplier,
     selections: {
@@ -214,7 +228,7 @@ export function calculateFramelessMirrorQuote(input = {}) {
     assets: {
       primaryImageUrl,
       gallery,
-      fallbackImageUrl: FRAMELESS_MIRROR_CONFIG.fallbackImageUrl,
+      fallbackImageUrl: defaultImages.fallbackImageUrl || FRAMELESS_MIRROR_CONFIG.fallbackImageUrl,
       datasheets: FRAMELESS_MIRROR_CONFIG.datasheets,
     },
   };

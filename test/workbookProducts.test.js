@@ -19,9 +19,15 @@ test("quotes workbook-backed cut glass", () => {
 
 test("quotes workbook fixed tables for shelves, kick plates, and series 3300", () => {
   const shelf = calculateQuote({
-    type: "shelves",
+    type: "series_855",
     customerGroup: "Guest",
-    item: "Series 855",
+    lengthInches: 16,
+    depthInches: 5,
+    finish: "18GA Brushed Steel",
+  });
+  const shelf3205 = calculateQuote({
+    type: "series_3205",
+    customerGroup: "Guest",
     lengthInches: 16,
     depthInches: 5,
     finish: "18GA Brushed Steel",
@@ -42,6 +48,7 @@ test("quotes workbook fixed tables for shelves, kick plates, and series 3300", (
   });
 
   assert.equal(shelf.price.unitCad, 66.75);
+  assert.equal(shelf3205.price.unitCad, 106.5);
   assert.equal(kickPlate.price.unitCad, 47.78);
   assert.equal(series3300.price.unitCad, 311.25);
 });
@@ -129,9 +136,9 @@ test("quotes exact SKU catalog products and hidden customer pricing", () => {
 });
 
 test("exposes dynamic field schemas for non-frameless calculators", () => {
-  const config = getCalculatorPublicConfig("kick_plates");
+  const config = getCalculatorPublicConfig("series_855");
 
-  assert.equal(config.type, "kick_plates");
-  assert.ok(config.fields.some((field) => field.name === "holesTape"));
+  assert.equal(config.type, "series_855");
+  assert.ok(config.fields.every((field) => field.name !== "item"));
   assert.ok(config.customerGroups.includes("Contractor"));
 });

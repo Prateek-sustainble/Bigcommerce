@@ -79,10 +79,29 @@ export function quantityFromInput(input = {}) {
   return Math.max(1, Math.trunc(numberOrZero(input.quantity) || 1));
 }
 
+const CUSTOMER_GROUP_ALIASES = {
+  guest: "Guest",
+  "default customer group": "Guest",
+  contractor: "Contractor",
+  house: "House",
+  special: "Special",
+  elite: "Elite",
+  platinum: "Platinum",
+  richelieu: "Richelieu",
+  "richelieu / hd supply": "Richelieu",
+};
+
+export function normalizeCustomerGroupName(value) {
+  if (!value) return "";
+  const normalized = String(value).trim().toLowerCase();
+  return CUSTOMER_GROUP_ALIASES[normalized] || "";
+}
+
 export function resolveCustomerMultiplier(customerGroup, familyKey) {
-  const normalizedGroup = customerGroup && CUSTOMER_DISCOUNTS[customerGroup] ? customerGroup : "Guest";
-  const multiplier = CUSTOMER_DISCOUNTS[normalizedGroup]?.[familyKey] ?? CUSTOMER_DISCOUNTS.Guest[familyKey] ?? 1;
-  return { group: normalizedGroup, multiplier };
+  const normalizedGroup = normalizeCustomerGroupName(customerGroup);
+  const resolvedGroup = normalizedGroup && CUSTOMER_DISCOUNTS[normalizedGroup] ? normalizedGroup : "Guest";
+  const multiplier = CUSTOMER_DISCOUNTS[resolvedGroup]?.[familyKey] ?? CUSTOMER_DISCOUNTS.Guest[familyKey] ?? 1;
+  return { group: resolvedGroup, multiplier };
 }
 
 export function priceBlock(unitCadBeforeCustomerDiscount, input, familyKey) {
@@ -106,7 +125,8 @@ export function priceBlock(unitCadBeforeCustomerDiscount, input, familyKey) {
 
 export function priceBlockFromCustomerPrices(customerPrices, input) {
   const quantity = quantityFromInput(input);
-  const requestedGroup = input.customerGroup && customerPrices[input.customerGroup] !== undefined ? input.customerGroup : "Guest";
+  const normalizedGroup = normalizeCustomerGroupName(input.customerGroup);
+  const requestedGroup = normalizedGroup && customerPrices[normalizedGroup] !== undefined ? normalizedGroup : "Guest";
   const unitCad = roundCurrency(customerPrices[requestedGroup] ?? customerPrices.Guest ?? 0);
   const unitUsd = roundCurrency(unitCad * CAD_TO_USD);
   return {
@@ -142,13 +162,25 @@ export function slug(value, separator = "_", mode = "lower") {
   return mode === "upper" ? normalized.toUpperCase() : normalized.toLowerCase();
 }
 
-export function imageSet({ prefix, value, baseUrl, fallbackImageUrl, datasheets }) {
+export function imageSet({
+  prefix,
+  value,
+  baseUrl,
+  fallbackImageUrl,
+  datasheets,
+  primaryImageUrl,
+  galleryCount = 3,
+  galleryUrls,
+}) {
   const lower = slug(value, "_", "lower");
   const upper = slug(value, "_", "upper");
-  const primaryImageUrl = `${baseUrl}/${prefix}_${lower}.png`;
+  const resolvedPrimaryImageUrl = primaryImageUrl || `${baseUrl}/${prefix}_${lower}.png`;
+  const gallery = Array.isArray(galleryUrls)
+    ? galleryUrls
+    : Array.from({ length: Math.max(0, Number(galleryCount) || 0) }, (_, index) => `${baseUrl}/${prefix}_${upper}-${index + 1}.png`);
   return {
-    primaryImageUrl,
-    gallery: [1, 2, 3, 4].map((index) => `${baseUrl}/${prefix}_${upper}-${index}.png`),
+    primaryImageUrl: resolvedPrimaryImageUrl,
+    gallery,
     fallbackImageUrl,
     datasheets,
   };
