@@ -123,6 +123,51 @@ test("quotes workbook guard profiles", () => {
     tape: "No",
     angle: 90,
   });
+  const cornerGuardMinimumWing = calculateQuote({
+    type: "corner_guard",
+    customerGroup: "Guest",
+    wing1Inches: 0,
+    wing1Fraction: 0.5,
+    wing2Inches: 0,
+    wing2Fraction: 0.5,
+    lengthInches: 4,
+    lengthFraction: 0,
+    guard: "18ga Brushed Steel",
+    easedEdge: "No",
+    holes: "No",
+    tape: "No",
+    angle: 90,
+  });
+  const cornerGuardTooSmallWing = calculateQuote({
+    type: "corner_guard",
+    customerGroup: "Guest",
+    wing1Inches: 0,
+    wing1Fraction: 0,
+    wing2Inches: 2,
+    wing2Fraction: 0,
+    lengthInches: 72,
+    lengthFraction: 0,
+    guard: "18ga Brushed Steel",
+    easedEdge: "No",
+    holes: "No",
+    tape: "No",
+    angle: 90,
+  });
+  const cornerGuardTooLong = calculateQuote({
+    type: "corner_guard",
+    customerGroup: "Guest",
+    wing1Inches: 2,
+    wing1Fraction: 0,
+    wing2Inches: 2,
+    wing2Fraction: 0,
+    lengthInches: 120,
+    lengthFraction: 0.25,
+    guard: "18ga Brushed Steel",
+    easedEdge: "No",
+    holes: "No",
+    tape: "No",
+    angle: 90,
+  });
   const jMould = calculateQuote({
     type: "j_mould",
     customerGroup: "Guest",
@@ -147,6 +192,13 @@ test("quotes workbook guard profiles", () => {
   assert.equal(cornerGuardWithFractionInputs.selections.wing2, 2.75);
   assert.equal(cornerGuardWithFractionInputs.selections.length, 72.5);
   assert.match(cornerGuardWithFractionInputs.assets.primaryImageUrl, /CORNER_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
+  assert.equal(cornerGuardMinimumWing.ok, true);
+  assert.equal(cornerGuardMinimumWing.selections.wing1, 0.5);
+  assert.equal(cornerGuardMinimumWing.selections.wing2, 0.5);
+  assert.equal(cornerGuardTooSmallWing.ok, false);
+  assert.match(cornerGuardTooSmallWing.message, /Size outside min\/max allowed/);
+  assert.equal(cornerGuardTooLong.ok, false);
+  assert.match(cornerGuardTooLong.message, /Size outside min\/max allowed/);
   assert.equal(jMould.price.unitCad, 26.25);
 });
 
@@ -200,10 +252,12 @@ test("Corner Guard config uses quarter fractions and material image swatches", (
 
   assert.equal(wing1.control, "dimension");
   assert.equal(wing1.defaultInches, 2);
-  assert.equal(wing1.min, 0.5);
+  assert.equal(wing1.min, 0);
   assert.equal(wing1.max, 12);
+  assert.deepEqual(wing1.inchesOptions, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.deepEqual(wing1.fractionOptions, quarterFractions);
   assert.equal(wing2.control, "dimension");
+  assert.deepEqual(wing2.inchesOptions, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   assert.deepEqual(wing2.fractionOptions, quarterFractions);
   assert.equal(length.control, "dimension");
   assert.equal(length.defaultInches, 72);
@@ -220,8 +274,9 @@ test("Corner Guard config uses quarter fractions and material image swatches", (
     "16ga Brushed Bronze",
     "16ga Brushed Black",
   ]);
-  assert.match(guard.swatches[0].imageUrl, /CORNER_GUARDS_18GA_BRUSHED_STEEL-1\.png$/);
-  assert.match(guard.swatches[5].imageUrl, /CORNER_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
+  assert.match(guard.swatches[0].color, /linear-gradient/);
+  assert.match(guard.swatches[5].color, /#111111/);
+  assert.equal(guard.swatches[0].imageUrl, undefined);
 });
 
 test("quotes antique mirror workbook default", () => {

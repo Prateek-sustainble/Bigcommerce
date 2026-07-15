@@ -63,6 +63,25 @@
       .join("");
   }
 
+  function inchesControlMarkup(field, inchesName, defaultValue) {
+    const value = field.defaultInches ?? defaultValue ?? 0;
+    if (Array.isArray(field.inchesOptions) && field.inchesOptions.length) {
+      const options = field.inchesOptions
+        .map((option) => {
+          const optionValue = Array.isArray(option) ? option[0] : option.value ?? option;
+          const label = Array.isArray(option) ? option[1] : option.label ?? optionValue;
+          const selected = String(optionValue) === String(value) ? " selected" : "";
+          return `<option value="${escapeHtml(optionValue)}"${selected}>${escapeHtml(label)}</option>`;
+        })
+        .join("");
+      return `<select data-sm-field="${escapeHtml(inchesName)}">${options}</select>`;
+    }
+
+    const min = field.min ?? 0;
+    const max = field.max ?? 120;
+    return `<input data-sm-field="${escapeHtml(inchesName)}" type="number" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="1" value="${escapeHtml(value)}">`;
+  }
+
   function swatchMarkup(field) {
     const defaultValue = field.default ?? (field.options || [])[0] ?? "";
     const swatches = (field.swatches || (field.options || []).map((value) => ({ value, label: value }))).filter(Boolean);
@@ -195,8 +214,6 @@
     const defaultValue = field.default ?? "";
     const condition = conditionAttributes(field);
     if (field.control === "dimension") {
-      const min = field.min ?? 0;
-      const max = field.max ?? 120;
       const inchesName = `${field.name}Inches`;
       const fractionName = `${field.name}Fraction`;
       return `
@@ -204,7 +221,7 @@
           <label>${label}</label>
           <div class="sm-number-pair">
             <span>Inches</span>
-            <input data-sm-field="${escapeHtml(inchesName)}" type="number" min="${escapeHtml(min)}" max="${escapeHtml(max)}" step="1" value="${escapeHtml(field.defaultInches ?? defaultValue ?? 0)}">
+            ${inchesControlMarkup(field, inchesName, defaultValue)}
           </div>
           <div class="sm-number-pair">
             <span>Fraction</span>

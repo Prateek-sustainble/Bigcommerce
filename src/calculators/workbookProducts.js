@@ -875,11 +875,40 @@ const U_GUARD_SWATCHES = GUARD_ITEMS.map((item) => ({
   imageUrl: WORKBOOK_IMAGE_ASSETS.u_guard.variants[item.label]?.primaryImageUrl || FALLBACK_IMAGE_URL,
 }));
 
-const CORNER_GUARD_SWATCHES = GUARD_ITEMS.map((item) => ({
-  value: item.label,
-  label: item.label,
-  imageUrl: WORKBOOK_IMAGE_ASSETS.corner_guard.variants[item.label]?.primaryImageUrl || FALLBACK_IMAGE_URL,
-}));
+const CORNER_GUARD_INCH_OPTIONS = Array.from({ length: 13 }, (_, index) => index);
+
+const CORNER_GUARD_SWATCHES = [
+  {
+    value: "18ga Brushed Steel",
+    label: "18ga Brushed Steel",
+    color: "linear-gradient(135deg, #707276 0%, #d5d7d6 48%, #8f9290 100%)",
+  },
+  {
+    value: "16ga Brushed Steel",
+    label: "16ga Brushed Steel",
+    color: "linear-gradient(135deg, #626568 0%, #c7caca 48%, #777a7b 100%)",
+  },
+  {
+    value: "20ga Mirror Steel",
+    label: "20ga Mirror Steel",
+    color: "linear-gradient(135deg, #ffffff 0%, #d9dcdb 42%, #f6f7f6 100%)",
+  },
+  {
+    value: "16ga Brushed Gold",
+    label: "16ga Brushed Gold",
+    color: "linear-gradient(135deg, #8b6a23 0%, #d6b44c 50%, #f2dda0 100%)",
+  },
+  {
+    value: "16ga Brushed Bronze",
+    label: "16ga Brushed Bronze",
+    color: "linear-gradient(135deg, #704534 0%, #bd927a 50%, #dbc0ad 100%)",
+  },
+  {
+    value: "16ga Brushed Black",
+    label: "16ga Brushed Black",
+    color: "linear-gradient(135deg, #111111 0%, #393837 50%, #171716 100%)",
+  },
+];
 
 const QUARTER_FRACTION_OPTIONS = [
   ["0", "0"],
@@ -1518,8 +1547,8 @@ const CUSTOM_CONFIGS = {
   corner_guard: {
     label: "Corner Guards",
     fields: [
-      { name: "wing1", label: "Wing 1", control: "dimension", defaultInches: 2, min: 0.5, max: 12, fractionOptions: QUARTER_FRACTION_OPTIONS },
-      { name: "wing2", label: "Wing 2", control: "dimension", defaultInches: 2, min: 0.5, max: 12, fractionOptions: QUARTER_FRACTION_OPTIONS },
+      { name: "wing1", label: "Wing 1", control: "dimension", defaultInches: 2, min: 0, max: 12, inchesOptions: CORNER_GUARD_INCH_OPTIONS, fractionOptions: QUARTER_FRACTION_OPTIONS },
+      { name: "wing2", label: "Wing 2", control: "dimension", defaultInches: 2, min: 0, max: 12, inchesOptions: CORNER_GUARD_INCH_OPTIONS, fractionOptions: QUARTER_FRACTION_OPTIONS },
       { name: "length", label: "Length", control: "dimension", defaultInches: 72, min: 4, max: 120, fractionOptions: QUARTER_FRACTION_OPTIONS },
       { name: "guard", label: "Guard", control: "swatch", options: GUARD_ITEMS.map((item) => item.label), swatches: CORNER_GUARD_SWATCHES, default: "18ga Brushed Steel" },
       { name: "easedEdge", label: "Eased Edge Y/N", control: "select", options: ["Yes", "No"], default: "No" },
