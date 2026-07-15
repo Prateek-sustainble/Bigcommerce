@@ -135,6 +135,50 @@ test("quotes exact SKU catalog products and hidden customer pricing", () => {
   assert.equal(convex.price.unitCad, 64.05);
 });
 
+test("quotes Series 850 fixed tilt from the current product sheet rules", () => {
+  const quote = calculateQuote({
+    type: "series_850_ft",
+    customerGroup: "Guest",
+    width: 24,
+    height: 36,
+    glazing: "5mm Standard",
+    frameFinishing: "SS Fixed Tilt Channel Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+  const gold = calculateQuote({
+    type: "series_850_ft",
+    customerGroup: "Guest",
+    width: 24,
+    height: 36,
+    glazing: "5mm Standard",
+    frameFinishing: "Brushed Steel Gold",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+  const config = getCalculatorPublicConfig("series_850_ft");
+  const frameFinishing = config.fields.find((field) => field.name === "frameFinishing");
+
+  assert.equal(quote.ok, true);
+  assert.equal(quote.price.unitCad, 261);
+  assert.equal(quote.price.unitUsd, 187.92);
+  assert.equal(quote.sku, "M-850FT-24X36-5MM-SSCH-NS-S2");
+  assert.equal(
+    quote.description,
+    "850FT Series 24\"x36\" 5mm Standard SS Fixed Tilt Channel Frame No Shelf Standard Packaging",
+  );
+  assert.equal(frameFinishing.control, "swatch");
+  assert.deepEqual(frameFinishing.options, [
+    "SS Fixed Tilt Channel Frame",
+    "Brushed Steel Gold",
+    "Brushed Steel Bronze",
+    "Brushed Steel Black",
+  ]);
+  assert.equal(gold.price.unitCad, 300.15);
+  assert.equal(gold.sku, "M-850FT-24X36-5MM-BRGO-NS-S2");
+  assert.match(gold.assets.primaryImageUrl, /BRUSHED-STEEL-GOLD-1\.png$/);
+});
+
 test("exposes dynamic field schemas for non-frameless calculators", () => {
   const config = getCalculatorPublicConfig("series_855");
 

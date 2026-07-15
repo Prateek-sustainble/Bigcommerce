@@ -59,6 +59,34 @@
       .join("");
   }
 
+  function swatchMarkup(field) {
+    const defaultValue = field.default ?? (field.options || [])[0] ?? "";
+    const swatches = (field.swatches || (field.options || []).map((value) => ({ value, label: value }))).filter(Boolean);
+    return swatches
+      .map((swatch) => {
+        const value = swatch.value ?? swatch.label ?? "";
+        const label = swatch.label || value;
+        const style = swatch.imageUrl
+          ? `background-image:url('${escapeHtml(swatch.imageUrl)}')`
+          : swatch.color
+            ? `background:${escapeHtml(swatch.color)}`
+            : "";
+        return `
+          <button
+            class="sm-swatch${String(value) === String(defaultValue) ? " is-active" : ""}"
+            type="button"
+            data-sm-swatch-value="${escapeHtml(value)}"
+            title="${escapeHtml(label)}"
+            aria-label="${escapeHtml(label)}"
+            aria-pressed="${String(value) === String(defaultValue) ? "true" : "false"}"
+          >
+            <span class="sm-swatch__sample" style="${style}"></span>
+          </button>
+        `;
+      })
+      .join("");
+  }
+
   function payload(root, options) {
     const data = { type: options.type, customerId: options.customerId ?? null };
     root.querySelectorAll("[data-sm-field]").forEach((field) => {
@@ -163,6 +191,20 @@
         <div class="sm-row">
           <label>${label}</label>
           <input data-sm-field="${escapeHtml(field.name)}" type="number" min="${escapeHtml(field.min ?? 0)}" max="${escapeHtml(field.max ?? "")}" step="${escapeHtml(field.step ?? 1)}" value="${escapeHtml(defaultValue)}">
+        </div>
+      `;
+    }
+    if (field.control === "swatch") {
+      return `
+        <div class="sm-row sm-swatch-row" data-sm-swatch-row="${escapeHtml(field.name)}">
+          <label>
+            <span>${label}</span>
+            <strong data-sm-swatch-label="${escapeHtml(field.name)}">${escapeHtml(defaultValue)}</strong>
+          </label>
+          <div class="sm-swatch-group">
+            <input data-sm-field="${escapeHtml(field.name)}" type="hidden" value="${escapeHtml(defaultValue)}">
+            ${swatchMarkup(field)}
+          </div>
         </div>
       `;
     }
@@ -365,6 +407,24 @@
     });
   }
 
+  function activateSwatch(root, button) {
+    const row = button.closest("[data-sm-swatch-row]");
+    if (!row) return;
+    const name = row.dataset.smSwatchRow;
+    const input = qs(row, `[data-sm-field='${name}']`);
+    if (!input) return;
+
+    input.value = button.dataset.smSwatchValue || "";
+    const label = qs(row, `[data-sm-swatch-label='${name}']`);
+    if (label) label.textContent = input.value;
+
+    row.querySelectorAll("button[data-sm-swatch-value]").forEach((swatchButton) => {
+      const isActive = swatchButton === button;
+      swatchButton.classList.toggle("is-active", isActive);
+      swatchButton.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
   async function updateQuote(root, options) {
     try {
       const quote = await requestJson(`${options.apiBase}/api/calculator/quote`, payload(root, options));
@@ -442,6 +502,13 @@
     root.addEventListener("input", () => updateQuote(root, options));
     root.addEventListener("change", () => updateQuote(root, options));
     root.addEventListener("click", (event) => {
+      const swatchButton = event.target.closest("button[data-sm-swatch-value]");
+      if (swatchButton && root.contains(swatchButton)) {
+        activateSwatch(root, swatchButton);
+        updateQuote(root, options);
+        return;
+      }
+
       const button = event.target.closest("button[data-sm-gallery-url]");
       if (!button || !root.contains(button)) return;
       activateGalleryImage(root, button.dataset.smGalleryUrl, root.dataset.smFallbackImageUrl);

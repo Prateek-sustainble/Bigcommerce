@@ -42,6 +42,58 @@
   justify-self: end;
 }
 
+.sm-swatch-row {
+  align-items: start;
+  padding: 10px 0;
+}
+
+.sm-swatch-row label {
+  display: grid;
+  gap: 5px;
+}
+
+.sm-swatch-row label strong {
+  justify-self: start;
+  font-size: 13px;
+  font-weight: 500;
+  color: #56596d;
+}
+
+.sm-swatch-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.sm-swatch {
+  width: 78px;
+  height: 58px;
+  border: 1px solid #d6d7dd;
+  border-radius: 0;
+  background: #fff;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sm-swatch + .sm-swatch {
+  margin-left: -1px;
+}
+
+.sm-swatch.is-active {
+  border-color: var(--sm-accent);
+  box-shadow: 0 0 0 2px rgba(41, 43, 70, 0.14);
+  position: relative;
+  z-index: 1;
+}
+
+.sm-swatch__sample {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
 .sm-dimensions {
   display: grid;
   gap: 14px;
@@ -217,5 +269,9 @@
 
   .sm-row strong {
     justify-self: start;
+  }
+
+  .sm-swatch-row label strong {
+    max-width: 100%;
   }
 }

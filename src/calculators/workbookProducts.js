@@ -77,12 +77,15 @@ function datasheets(name) {
 }
 
 function productAssets({ type, prefix, value, datasheetName }) {
-  const assetSet = WORKBOOK_IMAGE_ASSETS[type] || WORKBOOK_IMAGE_ASSETS[prefixToType(prefix)];
+  const assetConfig = WORKBOOK_IMAGE_ASSETS[type] || WORKBOOK_IMAGE_ASSETS[prefixToType(prefix)];
+  const assetSet = assetConfig?.variants
+    ? assetConfig.variants[value] || assetConfig.variants[Object.keys(assetConfig.variants)[0]]
+    : assetConfig;
   return imageSet({
     prefix,
     value,
     baseUrl: IMAGE_BASE_URL,
-    fallbackImageUrl: assetSet?.fallbackImageUrl || FALLBACK_IMAGE_URL,
+    fallbackImageUrl: assetSet?.fallbackImageUrl || assetConfig?.fallbackImageUrl || FALLBACK_IMAGE_URL,
     datasheets: datasheets(datasheetName || value),
     primaryImageUrl: assetSet?.primaryImageUrl,
     galleryUrls: assetSet?.galleryUrls,
@@ -519,13 +522,25 @@ function uniqueOptions(rows, field) {
 
 function catalogConfig(type) {
   const catalog = SKU_CATALOG[type];
-  const fields = catalog.fields.map((field) => ({
-    name: field,
-    label: fieldLabels[field] || field,
-    control: "select",
-    options: uniqueOptions(catalog.rows, field),
-    default: preferredDefault(type, field, uniqueOptions(catalog.rows, field)),
-  }));
+  const fields = catalog.fields.map((field) => {
+    const rawOptions = uniqueOptions(catalog.rows, field);
+    const swatchConfig = CATALOG_SWATCH_FIELDS[type]?.[field];
+    const optionOrder = CATALOG_OPTION_ORDERS[type]?.[field];
+    const sortedOptions = optionOrder
+      ? optionOrder.filter((value) => rawOptions.includes(value))
+      : rawOptions;
+    const orderedOptions = swatchConfig
+      ? swatchConfig.swatches.map((swatch) => swatch.value).filter((value) => rawOptions.includes(value))
+      : sortedOptions;
+    return {
+      name: field,
+      label: fieldLabels[field] || field,
+      control: swatchConfig ? "swatch" : "select",
+      options: orderedOptions,
+      swatches: swatchConfig?.swatches.filter((swatch) => orderedOptions.includes(swatch.value)),
+      default: preferredDefault(type, field, orderedOptions),
+    };
+  });
   return {
     type,
     label: catalog.label,
@@ -535,6 +550,52 @@ function catalogConfig(type) {
     datasheets: datasheets(type),
   };
 }
+
+const CATALOG_SWATCH_FIELDS = {
+  series_850_ft: {
+    frameFinishing: {
+      swatches: [
+        {
+          value: "SS Fixed Tilt Channel Frame",
+          label: "Stainless Steel",
+          color: "linear-gradient(135deg, #f7f7f4 0%, #bfc2bf 52%, #ffffff 100%)",
+        },
+        {
+          value: "Brushed Steel Gold",
+          label: "Gold",
+          color: "linear-gradient(135deg, #6d551e 0%, #d1b153 45%, #f0df99 100%)",
+        },
+        {
+          value: "Brushed Steel Bronze",
+          label: "Bronze",
+          color: "linear-gradient(135deg, #6d4335 0%, #b88b73 48%, #d7baa8 100%)",
+        },
+        {
+          value: "Brushed Steel Black",
+          label: "Black",
+          color: "linear-gradient(135deg, #030303 0%, #272625 52%, #070707 100%)",
+        },
+      ],
+    },
+  },
+};
+
+const CATALOG_OPTION_ORDERS = {
+  series_850_ft: {
+    glazing: [
+      "5mm Standard",
+      "6mm Mirror",
+      "6mm Tempered",
+      "S/S Mirror",
+      "3mm Acrylic",
+      "6mm Acrylic",
+      "5mm w/ Shatter Stop",
+      "6mm w/ Shatter Stop",
+    ],
+    shelf: ["No Shelf", "Standard Shelf"],
+    packaging: ["Standard Packaging", "Standard 1 Per Box"],
+  },
+};
 
 function preferredDefault(type, field, options) {
   const defaultFrameFinishing = {
@@ -550,7 +611,7 @@ function preferredDefault(type, field, options) {
     glazing: type === "series_4100" ? "5mm Mirror" : "5mm Standard",
     frameFinishing: defaultFrameFinishing[type] || options[0],
     shelf: "No Shelf",
-    packaging: options.includes("Standard Box") ? "Standard Box" : options[0],
+    packaging: options.includes("Standard Packaging") ? "Standard Packaging" : options.includes("Standard Box") ? "Standard Box" : options[0],
     category: "Indoor Acrylic Convex Mirror",
     itemCode: "ICM-26",
   };
