@@ -34,9 +34,6 @@ import {
 
 const EDGE_WORKS = ["No", "Clean Cut", "Arrised Edge", "Polished Edge"];
 const YES_NO = ["No", "Yes"];
-const EASED_EDGE_OPTIONS = ["No Eased Edge", "Eased Edge"];
-const HOLE_OPTIONS = ["No Holes", "Holes", "Countersunk"];
-const TAPE_OPTIONS = ["No Tape", "Tape"];
 
 const CATALOG_IMAGE_FIELDS = {
   series_850: { prefix: "SERIES_850", field: "frameFinishing" },
@@ -52,9 +49,46 @@ function normalizedOption(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function valuesEqual(rowValue, inputValue) {
+const CATALOG_VALUE_ALIASES = {
+  packaging: {
+    "standard packaging": "standard box",
+    "standard 1 per box": "courier box",
+  },
+  frameFinishing: {
+    "brushed stainless steel fixed tilt frame": "brushed s/s fixed tilt frame",
+    "powder coat black stainless steel fixed tilt frame": "powder coat black s/s fixed tilt frame",
+    "powder coat white stainless steel fixed tilt frame": "powder coat white s/s fixed tilt frame",
+  },
+  shelf: {
+    "integral shelf": "integral",
+  },
+};
+
+function canonicalOption(field, value) {
+  const normalized = normalizedOption(value);
+  return CATALOG_VALUE_ALIASES[field]?.[normalized] || normalized;
+}
+
+function valuesEqual(rowValue, inputValue, field) {
   if (typeof rowValue === "number") return Number(inputValue) === rowValue;
-  return normalizedOption(rowValue) === normalizedOption(inputValue);
+  return canonicalOption(field, rowValue) === canonicalOption(field, inputValue);
+}
+
+function displayOptionsFromInput(catalog, candidate, input) {
+  return Object.fromEntries(
+    catalog.fields.map((field) => [
+      field,
+      valuesEqual(candidate.options[field], input[field], field) ? input[field] : candidate.options[field],
+    ]),
+  );
+}
+
+function descriptionWithDisplayOptions(description, candidateOptions, displayOptions) {
+  return Object.entries(displayOptions).reduce((result, [field, displayValue]) => {
+    const sourceValue = candidateOptions[field];
+    if (sourceValue === displayValue || sourceValue === undefined || sourceValue === null) return result;
+    return result.replace(String(sourceValue), String(displayValue));
+  }, description);
 }
 
 function findByLabel(items, label, fallback = items[0]) {
@@ -106,17 +140,16 @@ function datasheets(name) {
 
 function productAssets({ type, prefix, value, datasheetName }) {
   const assetConfig = WORKBOOK_IMAGE_ASSETS[type] || WORKBOOK_IMAGE_ASSETS[prefixToType(prefix)];
-  const assetSet = assetConfig?.variants
-    ? assetConfig.variants[value] || assetConfig.variants[Object.keys(assetConfig.variants)[0]]
-    : assetConfig;
+  const assetSet = assetConfig?.variants ? assetConfig.variants[value] : assetConfig;
+  const fallbackImageUrl = assetSet?.fallbackImageUrl || assetConfig?.fallbackImageUrl || FALLBACK_IMAGE_URL;
   return imageSet({
     prefix,
     value,
     baseUrl: IMAGE_BASE_URL,
-    fallbackImageUrl: assetSet?.fallbackImageUrl || assetConfig?.fallbackImageUrl || FALLBACK_IMAGE_URL,
+    fallbackImageUrl,
     datasheets: datasheets(datasheetName || value),
-    primaryImageUrl: assetSet?.primaryImageUrl,
-    galleryUrls: assetSet?.galleryUrls,
+    primaryImageUrl: assetSet?.primaryImageUrl || fallbackImageUrl,
+    galleryUrls: assetSet?.galleryUrls || [],
   });
 }
 
@@ -191,7 +224,7 @@ function validateSheetSize({ width, height, minWidth, minHeight, maxBothSides, m
 
 function calculateCutGlass(input = {}) {
   const item = findByLabel(CUT_GLASS_ITEMS, input.item);
-  const edgeWork = input.edgeWork || "Clean Cut";
+  const edgeWork = input.edgeWork || "Polished Edge";
   if (!item.edgeWorkPerInch[edgeWork] && item.edgeWorkPerInch[edgeWork] !== 0) {
     return unavailable(`Unsupported edge work option: ${edgeWork}`);
   }
@@ -280,7 +313,7 @@ function calculateSeries855Shelves(input = {}) {
 }
 
 function calculateSeries3205Shelves(input = {}) {
-  return calculateShelvesForItem("Series 3205", input, "series_3205");
+  return calculateShelvesForItem("Series 855", input, "series_3205");
 }
 
 function calculateKickPlates(input = {}) {
@@ -294,7 +327,7 @@ function calculateKickPlates(input = {}) {
   const normalizedWidth = roundUpToEvenInches(width);
   const normalizedHeight = roundUpToEvenInches(height);
   const squareFeet = Math.max(2, (normalizedWidth * normalizedHeight) / 144);
-  const exactFixedPrice = item.label === "18 Gauge #4 Brush"
+  const exactFixedPrice = item.abbreviation === "18G"
     ? fixedPrice("kick_plates", { width: normalizedWidth, height: normalizedHeight })
     : undefined;
   const sizePriceCad = exactFixedPrice ?? item.psf * squareFeet;
@@ -308,7 +341,7 @@ function calculateKickPlates(input = {}) {
     type: "kick_plates",
     unitListCad: listCad,
     sku: `KICK-${item.abbreviation}-CUSTOM`,
-    description: `KICK-Series-Item ${item.imageLabel}-Width${widthLabel}xHeight${heightLabel}- ${holesTape.label}`,
+    description: `KICK-Series-Item ${item.label}-Width${widthLabel}xHeight${heightLabel}- ${holesTape.label}`,
     selections: { item: item.label, width, height, holesTape: holesTape.label },
     calculation: {
       normalizedWidth,
@@ -428,6 +461,21 @@ function guardBasePrice(totalWidth, pricingLength) {
   return (totalWidth * pricingLength) / 144 * 18.85 + 4.45 + pricingLength * 0.1125;
 }
 
+function yesNoOption(value, yesLabel, noLabel) {
+  const normalized = normalizedOption(value);
+  if (normalized === "yes") return yesLabel;
+  if (normalized === "no") return noLabel;
+  return value || noLabel;
+}
+
+function holesOption(value) {
+  const normalized = normalizedOption(value);
+  if (normalized === "yes") return "Holes";
+  if (normalized === "no") return "No Holes";
+  if (normalized === "countersunk") return "Countersunk";
+  return value || "No Holes";
+}
+
 function calculateUGuards(input = {}) {
   const guard = findByLabel(GUARD_ITEMS, input.guard);
   const wing1 = numberOrZero(input.wing1);
@@ -442,18 +490,21 @@ function calculateUGuards(input = {}) {
   const pricingLength = Math.max(48, length);
   const basePriceCad = guardBasePrice(wing1 + center + wing2, pricingLength);
   const guardPriceCad = basePriceCad + basePriceCad * guard.add;
-  const easedEdgePriceCad = input.easedEdge === "Eased Edge" ? length * 0.05 : 0;
-  const holesPriceCad = input.holes === "Holes" ? 0.1 * length / 6 : input.holes === "Countersunk" ? 0.25 * length / 6 : 0;
-  const tapePriceCad = input.tape === "Tape" ? 0.1 * length : 0;
+  const easedEdge = yesNoOption(input.easedEdge, "Eased Edge", "No Eased Edge");
+  const holes = holesOption(input.holes);
+  const tape = yesNoOption(input.tape, "Tape", "No Tape");
+  const easedEdgePriceCad = easedEdge === "Eased Edge" ? length * 0.05 : 0;
+  const holesPriceCad = holes === "Holes" ? 0.1 * length / 6 : holes === "Countersunk" ? 0.25 * length / 6 : 0;
+  const tapePriceCad = tape === "Tape" ? 0.1 * length : 0;
   const listCad = guardPriceCad + easedEdgePriceCad + holesPriceCad + tapePriceCad;
 
   return quoteResponse({
     input,
     type: "u_guard",
     unitListCad: listCad,
-    sku: `UGUARD-${wing1}-${center}-${wing2}-${length}-${guard.abbreviation}-CUSTOM`,
-    description: `UGUARD-Series-Wing${wing1}-Center${center}-Wing${wing2}-Length${length}- ${guard.label}`,
-    selections: { wing1, center, wing2, length, guard: guard.label, easedEdge: input.easedEdge || "No Eased Edge", holes: input.holes || "No Holes", tape: input.tape || "No Tape" },
+    sku: `UGUARD-${guard.abbreviation}-CUSTOM`,
+    description: `UGUARD-Wing (1) ${wing1}-Center ${center}-Wing (2) ${wing2}-Length ${length}- ${guard.label}- ${easedEdge}- ${holes}- ${tape === "Tape" ? "TapeYes" : "No Tape"}`,
+    selections: { wing1, center, wing2, length, guard: guard.label, easedEdge, holes, tape },
     calculation: {
       pricingLength,
       basePriceCad: roundCurrency(basePriceCad),
@@ -482,9 +533,12 @@ function calculateCornerGuards(input = {}) {
   const pricingLength = Math.max(48, length);
   const basePriceCad = guardBasePrice(wing1 + wing2, pricingLength);
   const guardPriceCad = basePriceCad + basePriceCad * guard.add;
-  const easedEdgePriceCad = input.easedEdge === "Eased Edge" ? length * 0.1125 : 0;
-  const holesPriceCad = input.holes === "Holes" ? 0.225 * length / 6 : input.holes === "Countersunk" ? 0.5625 * length / 6 : 0;
-  const tapePriceCad = input.tape === "Tape" ? 0.225 * length : 0;
+  const easedEdge = yesNoOption(input.easedEdge, "Eased Edge", "No Eased Edge");
+  const holes = holesOption(input.holes);
+  const tape = yesNoOption(input.tape, "Tape", "No Tape");
+  const easedEdgePriceCad = easedEdge === "Eased Edge" ? length * 0.1125 : 0;
+  const holesPriceCad = holes === "Holes" ? 0.225 * length / 6 : holes === "Countersunk" ? 0.5625 * length / 6 : 0;
+  const tapePriceCad = tape === "Tape" ? 0.225 * length : 0;
   const nonStandardAngleFeeCad = angle === 90 ? 0 : (guardPriceCad + holesPriceCad) * 0.05;
   const listCad = guardPriceCad + easedEdgePriceCad + holesPriceCad + tapePriceCad + nonStandardAngleFeeCad;
 
@@ -492,9 +546,9 @@ function calculateCornerGuards(input = {}) {
     input,
     type: "corner_guard",
     unitListCad: listCad,
-    sku: `CORNER-${wing1}-${wing2}-${length}-${guard.abbreviation}-CUSTOM`,
-    description: `CORNER-Series-Wing${wing1}-Wing${wing2}-Length${length}- ${guard.label}- Angle ${angle}`,
-    selections: { wing1, wing2, length, guard: guard.label, easedEdge: input.easedEdge || "No Eased Edge", holes: input.holes || "No Holes", tape: input.tape || "No Tape", angle },
+    sku: `CORNER-${guard.abbreviation}-CUSTOM`,
+    description: `CORNER-Series-Wing (1) ${wing1}-Wing (2) ${wing2}-Length ${length}-Guard ${guard.label}- ${easedEdge}- ${holes}- ${tape}- Angle ${angle}`,
+    selections: { wing1, wing2, length, guard: guard.label, easedEdge, holes, tape, angle },
     calculation: {
       pricingLength,
       basePriceCad: roundCurrency(basePriceCad),
@@ -528,8 +582,8 @@ function calculateJMould(input = {}) {
     type: "j_mould",
     familyKey: "u_guard",
     unitListCad: listCad,
-    sku: `JMOULD-${face}-${center}-${back}-${length}-${guard.abbreviation}-CUSTOM`,
-    description: `JMOULD-Series-Face${face}-Center${center}-Back${back}-Length${length}- ${guard.label}`,
+    sku: `JMOULD-${guard.abbreviation}-CUSTOM`,
+    description: `JMOULD-Face ${face}-Center ${center}-Back ${back}-Length ${length}-Guard ${guard.label}`,
     selections: { face, center, back, length, guard: guard.label },
     calculation: {
       pricingLength,
@@ -552,13 +606,14 @@ function catalogConfig(type) {
   const catalog = SKU_CATALOG[type];
   const fields = catalog.fields.map((field) => {
     const rawOptions = uniqueOptions(catalog.rows, field);
+    const configuredOptions = CATALOG_OPTION_OVERRIDES[type]?.[field] || rawOptions;
     const swatchConfig = CATALOG_SWATCH_FIELDS[type]?.[field];
     const optionOrder = CATALOG_OPTION_ORDERS[type]?.[field];
     const sortedOptions = optionOrder
-      ? optionOrder.filter((value) => rawOptions.includes(value))
-      : rawOptions;
+      ? optionOrder.filter((value) => configuredOptions.includes(value))
+      : configuredOptions;
     const orderedOptions = swatchConfig
-      ? swatchConfig.swatches.map((swatch) => swatch.value).filter((value) => rawOptions.includes(value))
+      ? swatchConfig.swatches.map((swatch) => swatch.value).filter((value) => configuredOptions.includes(value))
       : sortedOptions;
     return {
       name: field,
@@ -579,7 +634,46 @@ function catalogConfig(type) {
   };
 }
 
+const MIRROR_GLAZING_OPTIONS = [
+  "5mm Standard",
+  "6mm Mirror",
+  "6mm Tempered",
+  "S/S Mirror",
+  "3mm Acrylic",
+  "6mm Acrylic",
+  "5mm w/ Shatter Stop",
+  "6mm w/ Shatter Stop",
+];
+const SERIES_850_GLAZING_OPTIONS = MIRROR_GLAZING_OPTIONS.filter((option) => option !== "6mm w/ Shatter Stop");
+const STANDARD_PACKAGING_OPTIONS = ["Standard Packaging", "Standard 1 Per Box"];
+
 const CATALOG_SWATCH_FIELDS = {
+  series_850: {
+    frameFinishing: {
+      swatches: [
+        {
+          value: "Stainless Steel Channel Frame",
+          label: "Stainless Steel",
+          color: "linear-gradient(135deg, #f7f7f4 0%, #bfc2bf 52%, #ffffff 100%)",
+        },
+        {
+          value: "Brushed Steel Gold",
+          label: "Gold",
+          color: "linear-gradient(135deg, #6d551e 0%, #d1b153 45%, #f0df99 100%)",
+        },
+        {
+          value: "Brushed Steel Bronze",
+          label: "Bronze",
+          color: "linear-gradient(135deg, #6d4335 0%, #b88b73 48%, #d7baa8 100%)",
+        },
+        {
+          value: "Brushed Steel Black",
+          label: "Black",
+          color: "linear-gradient(135deg, #030303 0%, #272625 52%, #070707 100%)",
+        },
+      ],
+    },
+  },
   series_850_ft: {
     frameFinishing: {
       swatches: [
@@ -606,22 +700,136 @@ const CATALOG_SWATCH_FIELDS = {
       ],
     },
   },
+  series_3200: {
+    frameFinishing: {
+      swatches: [
+        {
+          value: "Brushed Stainless Frame",
+          label: "Brushed Stainless",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/78a91e80-2244-41ca-bd19-e8905caaa2de-Brushed%20steel.png",
+        },
+        {
+          value: "Powder Coat Black Frame",
+          label: "Black",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/f1917252-4762-4e64-b7d4-89754ddf557b-Black%20Powder%20Coat.png",
+        },
+        {
+          value: "Powder Coat White Frame",
+          label: "White",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/d0a2ed00-b61a-4a4e-b4f8-9d927ebbc41a-White%20Powder%20Coat.png",
+        },
+      ],
+    },
+  },
+  series_3200_ft: {
+    frameFinishing: {
+      swatches: [
+        {
+          value: "Brushed Stainless Steel Fixed Tilt Frame",
+          label: "Brushed Stainless",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/95585cf5-8f76-4999-8974-4cb245f321d8-Brushed%20steel.png",
+        },
+        {
+          value: "Powder Coat White Stainless Steel Fixed Tilt Frame",
+          label: "White",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/f3974792-bd1c-475d-b327-449585d39585-White%20Powder%20Coat.png",
+        },
+        {
+          value: "Powder Coat Black Stainless Steel Fixed Tilt Frame",
+          label: "Black",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/3dd16474-c6a5-4323-8c9a-3123f2781247-Black%20Powder%20Coat.png",
+        },
+      ],
+    },
+  },
+  series_4100: {
+    frameFinishing: {
+      swatches: [
+        {
+          value: "Brushed Stainless Steel",
+          label: "Brushed Stainless",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/754254f3-30b4-46ce-968d-657eb939d2f1-Brushed%20steel.png",
+        },
+        {
+          value: "Mirror Polished Stainless Steel",
+          label: "Mirror Polished",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/0569f300-eaad-4f6f-8e89-68ce833696c2-Mirror%20Polished.png",
+        },
+        {
+          value: "Brushed Copper Stainless Steel",
+          label: "Brushed Copper",
+          imageUrl: "https://grid-is.imgix.net/jackroelfsema/ba5654ba-7a40-4691-acc9-bd22fa0a0015-brushed%20bronze.jpg",
+        },
+        {
+          value: "Brushed Black Stainless Steel",
+          label: "Brushed Black",
+          imageUrl: "https://grid-is.imgix.net/securitymirror/d5f2d77d-f726-4928-a4e4-897e7a435220-Brushed%20Black.png",
+        },
+      ],
+    },
+  },
+};
+
+const CATALOG_OPTION_OVERRIDES = {
+  series_850: {
+    glazing: SERIES_850_GLAZING_OPTIONS,
+    frameFinishing: [
+      "Stainless Steel Channel Frame",
+      "Brushed Steel Gold",
+      "Brushed Steel Bronze",
+      "Brushed Steel Black",
+    ],
+    shelf: ["No Shelf", "Standard Shelf"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
+  },
+  series_3200: {
+    glazing: MIRROR_GLAZING_OPTIONS,
+    frameFinishing: ["Brushed Stainless Frame", "Powder Coat Black Frame", "Powder Coat White Frame"],
+    shelf: ["No Shelf", "Standard Shelf", "Integral Shelf"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
+  },
+  series_3200_ft: {
+    glazing: MIRROR_GLAZING_OPTIONS,
+    frameFinishing: [
+      "Brushed Stainless Steel Fixed Tilt Frame",
+      "Powder Coat White Stainless Steel Fixed Tilt Frame",
+      "Powder Coat Black Stainless Steel Fixed Tilt Frame",
+    ],
+    shelf: ["No Shelf", "Standard Shelf", "Integral"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
+  },
+  series_4100: {
+    glazing: ["5mm Mirror", "6mm Mirror", "6mm Tempered", "6mm Laminated", "5mm w/ Shatter Stop", "6mm w/ Shatter Stop"],
+    frameFinishing: [
+      "Brushed Stainless Steel",
+      "Mirror Polished Stainless Steel",
+      "Brushed Copper Stainless Steel",
+      "Brushed Black Stainless Steel",
+    ],
+    packaging: ["Courier Box"],
+  },
 };
 
 const CATALOG_OPTION_ORDERS = {
-  series_850_ft: {
-    glazing: [
-      "5mm Standard",
-      "6mm Mirror",
-      "6mm Tempered",
-      "S/S Mirror",
-      "3mm Acrylic",
-      "6mm Acrylic",
-      "5mm w/ Shatter Stop",
-      "6mm w/ Shatter Stop",
-    ],
+  series_850: {
+    glazing: SERIES_850_GLAZING_OPTIONS,
     shelf: ["No Shelf", "Standard Shelf"],
-    packaging: ["Standard Packaging", "Standard 1 Per Box"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
+  },
+  series_850_ft: {
+    glazing: MIRROR_GLAZING_OPTIONS,
+    shelf: ["No Shelf", "Standard Shelf"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
+  },
+  series_3200: {
+    glazing: MIRROR_GLAZING_OPTIONS,
+    shelf: ["No Shelf", "Standard Shelf", "Integral Shelf"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
+  },
+  series_3200_ft: {
+    glazing: MIRROR_GLAZING_OPTIONS,
+    shelf: ["No Shelf", "Standard Shelf", "Integral"],
+    packaging: STANDARD_PACKAGING_OPTIONS,
   },
 };
 
@@ -630,8 +838,8 @@ function preferredDefault(type, field, options) {
     series_850: "Stainless Steel Channel Frame",
     series_850_ft: "SS Fixed Tilt Channel Frame",
     series_3200: "Brushed Stainless Frame",
-    series_3200_ft: "Brushed S/S Fixed Tilt Frame",
-    series_4100: "Brushed Stainless Steel",
+    series_3200_ft: "Brushed Stainless Steel Fixed Tilt Frame",
+    series_4100: "Brushed Black Stainless Steel",
   };
   const defaults = {
     width: 24,
@@ -679,9 +887,13 @@ const fieldLabels = {
 function calculateCatalogQuote(type, input = {}) {
   const catalog = SKU_CATALOG[type];
   if (!catalog) return unavailable(`Unsupported calculator type: ${type}`, "unsupported");
+  if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
+  if (type === "series_3200" || type === "series_3200_ft") {
+    return calculateAdjustedCatalogQuote(type, catalog, input);
+  }
   const candidate = catalog.rows.find((row) => {
-    if (type === "convex_domes" && input.itemCode) return valuesEqual(row.options.itemCode, input.itemCode);
-    return catalog.fields.every((field) => valuesEqual(row.options[field], input[field]));
+    if (type === "convex_domes" && input.itemCode) return valuesEqual(row.options.itemCode, input.itemCode, "itemCode");
+    return catalog.fields.every((field) => valuesEqual(row.options[field], input[field], field));
   });
   if (!candidate) return unavailable("No matching workbook SKU price row for the selected options.");
 
@@ -714,6 +926,126 @@ function calculateCatalogQuote(type, input = {}) {
   };
 }
 
+const CURRENT_CATALOG_PRICE_FACTORS = {
+  series_3200: 1.04,
+  series_3200_ft: 1.04,
+};
+
+function calculateAdjustedCatalogQuote(type, catalog, input = {}) {
+  const candidate = catalog.rows.find((row) =>
+    catalog.fields.every((field) => valuesEqual(row.options[field], input[field], field)),
+  );
+  if (!candidate) return unavailable("No matching workbook SKU price row for the selected options.");
+
+  const workbookFactor = CURRENT_CATALOG_PRICE_FACTORS[type] ?? 1;
+  const unitListCad = roundToQuarter(candidate.prices.Guest * workbookFactor);
+  const price = priceBlock(unitListCad, input, type);
+  const imageConfig = CATALOG_IMAGE_FIELDS[type];
+  const displayOptions = displayOptionsFromInput(catalog, candidate, input);
+  const assetValue = imageConfig.field === "sku" ? type : displayOptions[imageConfig.field];
+  const description = descriptionWithDisplayOptions(candidate.description, candidate.options, displayOptions);
+
+  return {
+    ok: true,
+    status: "quoted",
+    type,
+    customerId: input.customerId ?? null,
+    customerGroup: price.customerGroup,
+    discountMultiplier: price.discountMultiplier,
+    selections: { ...displayOptions, quantity: price.quantity },
+    calculation: {
+      source: "workbook_2026_adjusted_catalog",
+      squareFeet: candidate.squareFeet,
+      lbsPerSquareFoot: candidate.lbsPerSquareFoot,
+      totalLbs: candidate.totalLbs,
+      importedListCad: candidate.prices.Guest,
+      workbookFactor,
+      listCadBeforeCustomerDiscount: roundCurrency(unitListCad),
+    },
+    price: price.price,
+    sku: candidate.sku,
+    description,
+    assets: productAssets({
+      type,
+      prefix: imageConfig.prefix,
+      value: assetValue,
+      datasheetName: type,
+    }),
+  };
+}
+
+const SERIES_850_FRAME_CODES = {
+  "Stainless Steel Channel Frame": "SSCH",
+  "Brushed Steel Gold": "BRGO",
+  "Brushed Steel Bronze": "BRBR",
+  "Brushed Steel Black": "BRBL",
+};
+
+const SERIES_850_FRAME_SURCHARGES = {
+  "Stainless Steel Channel Frame": 0,
+  "Brushed Steel Gold": 0.15,
+  "Brushed Steel Bronze": 0.15,
+  "Brushed Steel Black": 0.15,
+};
+
+function roundToQuarter(value) {
+  return Math.round((Number(value) + Number.EPSILON) / 0.25) * 0.25;
+}
+
+function calculateSeries850CatalogQuote(catalog, input = {}) {
+  const candidate = catalog.rows.find((row) =>
+    catalog.fields.every((field) =>
+      field === "frameFinishing" || valuesEqual(row.options[field], input[field], field),
+    ),
+  );
+  if (!candidate) return unavailable("No matching workbook SKU price row for the selected options.");
+
+  const frameFinishing = Object.hasOwn(SERIES_850_FRAME_CODES, input.frameFinishing)
+    ? input.frameFinishing
+    : candidate.options.frameFinishing;
+  const baseListCad = roundToQuarter(candidate.prices.Guest * 1.04);
+  const frameSurchargeRate = SERIES_850_FRAME_SURCHARGES[frameFinishing] ?? 0;
+  const frameSurchargeCad = baseListCad * frameSurchargeRate;
+  const listCad = baseListCad + frameSurchargeCad;
+  const price = priceBlock(listCad, input, "series_850");
+  const imageConfig = CATALOG_IMAGE_FIELDS.series_850;
+  const frameCode = SERIES_850_FRAME_CODES[frameFinishing] || "SSCH";
+  const displayOptions = {
+    ...displayOptionsFromInput(catalog, candidate, input),
+    frameFinishing,
+  };
+  const description = descriptionWithDisplayOptions(candidate.description, candidate.options, displayOptions);
+
+  return {
+    ok: true,
+    status: "quoted",
+    type: "series_850",
+    customerId: input.customerId ?? null,
+    customerGroup: price.customerGroup,
+    discountMultiplier: price.discountMultiplier,
+    selections: { ...displayOptions, quantity: price.quantity },
+    calculation: {
+      source: "workbook_2026_series_850",
+      squareFeet: candidate.squareFeet,
+      lbsPerSquareFoot: candidate.lbsPerSquareFoot,
+      totalLbs: candidate.totalLbs,
+      basePriceCad: roundCurrency(baseListCad),
+      frameSurchargeRate,
+      frameSurchargeCad: roundCurrency(frameSurchargeCad),
+      listCadBeforeCustomerDiscount: roundCurrency(listCad),
+    },
+    price: price.price,
+    sku: candidate.sku.replace("-SSCH-", `-${frameCode}-`),
+    description,
+    assets: productAssets({
+      type: "series_850",
+      prefix: imageConfig.prefix,
+      value: frameFinishing,
+      datasheetName: "series_850",
+    }),
+  };
+}
+
 const CUSTOM_CONFIGS = {
   cut_glass: {
     label: "Cut Glass",
@@ -721,7 +1053,7 @@ const CUSTOM_CONFIGS = {
       { name: "item", label: "Finishing", control: "select", options: CUT_GLASS_ITEMS.map((item) => item.label), default: "Clear Glass 5mm" },
       { name: "width", label: "Width", control: "dimension", defaultInches: 24, min: 12, max: 120 },
       { name: "height", label: "Height", control: "dimension", defaultInches: 36, min: 12, max: 120 },
-      { name: "edgeWork", label: "Edge Work", control: "select", options: EDGE_WORKS.filter((edge) => edge !== "No"), default: "Clean Cut" },
+      { name: "edgeWork", label: "Edge Work", control: "select", options: EDGE_WORKS.filter((edge) => edge !== "No"), default: "Polished Edge" },
     ],
   },
   shelves: {
@@ -730,7 +1062,7 @@ const CUSTOM_CONFIGS = {
       { name: "item", label: "Series", control: "select", options: SHELF_ITEMS.map((item) => item.label), default: "Series 855" },
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Finish", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
   series_855: {
@@ -738,7 +1070,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Finish", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
   series_3205: {
@@ -746,28 +1078,28 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Finish", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
   kick_plates: {
     label: "Kick Plates",
     fields: [
-      { name: "item", label: "Thickness", control: "select", options: KICK_PLATE_ITEMS.map((item) => item.label), default: "18 Gauge #4 Brush" },
-      { name: "width", label: "Width", control: "dimension", defaultInches: 32, min: 6, max: 96 },
-      { name: "height", label: "Height", control: "dimension", defaultInches: 8, min: 6, max: 96 },
-      { name: "holesTape", label: "Holes / Tape", control: "select", options: KICK_PLATE_EXTRAS.map((item) => item.label), default: "No Holes | No Tape" },
+      { name: "item", label: "Finishing", control: "select", options: KICK_PLATE_ITEMS.map((item) => item.label), default: "18GA Brushed Steel" },
+      { name: "width", label: "Width", control: "dimension", defaultInches: 48, min: 6, max: 96 },
+      { name: "height", label: "Height", control: "dimension", defaultInches: 6, min: 6, max: 96 },
+      { name: "holesTape", label: "Holes/Tape", control: "select", options: KICK_PLATE_EXTRAS.map((item) => item.label), default: "No Holes | No Tape" },
     ],
   },
   antique: {
     label: "Antique Mirror",
     fields: [
-      { name: "item", label: "Item", control: "select", options: ANTIQUE_ITEMS.map((item) => item.label), default: "9100" },
-      { name: "thickness", label: "Thickness", control: "select", options: ["3MM", "5MM", "6MM"], default: "5MM" },
+      { name: "item", label: "Model", control: "select", options: ANTIQUE_ITEMS.map((item) => item.label), default: "9100" },
+      { name: "thickness", label: "Depth Thickness", control: "select", options: ["3MM", "5MM", "6MM"], default: "5MM" },
       { name: "width", label: "Width", control: "dimension", defaultInches: 48, min: 6, max: 96 },
       { name: "height", label: "Height", control: "dimension", defaultInches: 36, min: 6, max: 96 },
-      { name: "edgeWork", label: "Edge Work", control: "select", options: EDGE_WORKS, default: "No" },
-      { name: "goldVeining", label: "Gold Veining", control: "select", options: YES_NO, default: "No" },
-      { name: "shatterStop", label: "Shatter Stop", control: "select", options: YES_NO, default: "No" },
+      { name: "goldVeining", label: "Add Gold Veining", control: "select", options: YES_NO, default: "No" },
+      { name: "shatterStop", label: "Shatter Stop (y/n)", control: "select", options: YES_NO, default: "No" },
+      { name: "edgeWork", label: "Polished Edge (y/n)", control: "select", options: EDGE_WORKS, default: "No" },
     ],
   },
   u_guard: {
@@ -778,9 +1110,9 @@ const CUSTOM_CONFIGS = {
       { name: "wing2", label: "Wing 2", control: "number", default: 2, min: 0, max: 24, step: 0.0625 },
       { name: "length", label: "Length", control: "number", default: 72, min: 4, max: 120, step: 0.0625 },
       { name: "guard", label: "Guard", control: "select", options: GUARD_ITEMS.map((item) => item.label), default: "18ga Brushed Steel" },
-      { name: "easedEdge", label: "Eased Edge", control: "select", options: EASED_EDGE_OPTIONS, default: "No Eased Edge" },
-      { name: "holes", label: "Holes", control: "select", options: HOLE_OPTIONS, default: "No Holes" },
-      { name: "tape", label: "Tape", control: "select", options: TAPE_OPTIONS, default: "Tape" },
+      { name: "easedEdge", label: "Eased Edge Y/N", control: "select", options: ["Yes", "No"], default: "No" },
+      { name: "holes", label: "Holes Y/N", control: "select", options: ["Yes", "No", "Countersunk"], default: "No" },
+      { name: "tape", label: "Tape Y/N", control: "select", options: ["Yes", "No"], default: "Yes" },
     ],
   },
   corner_guard: {
@@ -790,9 +1122,9 @@ const CUSTOM_CONFIGS = {
       { name: "wing2", label: "Wing 2", control: "number", default: 2, min: 0.5, max: 12, step: 0.0625 },
       { name: "length", label: "Length", control: "number", default: 72, min: 4, max: 120, step: 0.0625 },
       { name: "guard", label: "Guard", control: "select", options: GUARD_ITEMS.map((item) => item.label), default: "18ga Brushed Steel" },
-      { name: "easedEdge", label: "Eased Edge", control: "select", options: EASED_EDGE_OPTIONS, default: "No Eased Edge" },
-      { name: "holes", label: "Holes", control: "select", options: HOLE_OPTIONS, default: "No Holes" },
-      { name: "tape", label: "Tape", control: "select", options: TAPE_OPTIONS, default: "No Tape" },
+      { name: "easedEdge", label: "Eased Edge Y/N", control: "select", options: ["Yes", "No"], default: "No" },
+      { name: "holes", label: "Holes Y/N", control: "select", options: ["Yes", "No", "Countersunk"], default: "No" },
+      { name: "tape", label: "Tape Y/N", control: "select", options: ["Yes", "No"], default: "No" },
       { name: "angle", label: "Angle", control: "number", default: 90, min: 90, max: 170, step: 5 },
     ],
   },

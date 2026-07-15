@@ -35,9 +35,9 @@ test("quotes workbook fixed tables for shelves, kick plates, and series 3300", (
   const kickPlate = calculateQuote({
     type: "kick_plates",
     customerGroup: "Guest",
-    item: "18 Gauge #4 Brush",
-    widthInches: 32,
-    heightInches: 8,
+    item: "18GA Brushed Steel",
+    widthInches: 48,
+    heightInches: 6,
     holesTape: "No Holes | No Tape",
   });
   const series3300 = calculateQuote({
@@ -48,8 +48,10 @@ test("quotes workbook fixed tables for shelves, kick plates, and series 3300", (
   });
 
   assert.equal(shelf.price.unitCad, 66.75);
-  assert.equal(shelf3205.price.unitCad, 106.5);
-  assert.equal(kickPlate.price.unitCad, 47.78);
+  assert.equal(shelf3205.price.unitCad, 66.75);
+  assert.equal(shelf3205.sku, "SHELF-855-M-N4SS-CUSTOM");
+  assert.equal(kickPlate.price.unitCad, 53.33);
+  assert.equal(kickPlate.sku, "KICK-18G-CUSTOM");
   assert.equal(series3300.price.unitCad, 311.25);
 });
 
@@ -119,7 +121,7 @@ test("quotes exact SKU catalog products and hidden customer pricing", () => {
     glazing: "5mm Standard",
     frameFinishing: "Stainless Steel Channel Frame",
     shelf: "No Shelf",
-    packaging: "Standard Box",
+    packaging: "Standard Packaging",
   });
   const convex = calculateQuote({
     type: "convex_domes",
@@ -129,10 +131,59 @@ test("quotes exact SKU catalog products and hidden customer pricing", () => {
   });
 
   assert.equal(series850.ok, true);
-  assert.equal(series850.price.unitCad, 85.23);
+  assert.equal(series850.price.unitCad, 88.55);
   assert.equal(series850.sku, "M-850-24X36-5MM-SSCH-NS-S2");
+
+  const series850Black = calculateQuote({
+    type: "series_850",
+    customerGroup: "Guest",
+    width: 24,
+    height: 36,
+    glazing: "5mm Standard",
+    frameFinishing: "Brushed Steel Black",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(series850Black.price.unitCad, 145.48);
+  assert.equal(series850Black.sku, "M-850-24X36-5MM-BRBL-NS-S2");
+  assert.match(series850Black.assets.primaryImageUrl, /SERIES_850_PICTURE_URL_LOWER_CASE-BRUSHED-STEEL-BLACK-1\.png$/);
   assert.equal(convex.ok, true);
   assert.equal(convex.price.unitCad, 64.05);
+});
+
+test("quotes Series 3200 and 3200FT against the current workbook list prices", () => {
+  const flat = calculateQuote({
+    type: "series_3200",
+    customerGroup: "Guest",
+    width: 24,
+    height: 36,
+    glazing: "5mm Standard",
+    frameFinishing: "Brushed Stainless Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+  const fixedTilt = calculateQuote({
+    type: "series_3200_ft",
+    customerGroup: "Guest",
+    width: 24,
+    height: 36,
+    glazing: "5mm Standard",
+    frameFinishing: "Brushed Stainless Steel Fixed Tilt Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(flat.ok, true);
+  assert.equal(flat.price.unitCad, 219.75);
+  assert.equal(flat.price.unitUsd, 158.22);
+  assert.equal(flat.sku, "M-3200-24X36-5MM-N4SS-NS-S2");
+  assert.match(flat.description, /Standard Packaging$/);
+  assert.equal(fixedTilt.ok, true);
+  assert.equal(fixedTilt.price.unitCad, 346);
+  assert.equal(fixedTilt.price.unitUsd, 249.12);
+  assert.equal(fixedTilt.sku, "M-3200FT-24X36-5MM-N4SS-NS-S2");
+  assert.match(fixedTilt.description, /Brushed Stainless Steel Fixed Tilt Frame No Shelf Standard Packaging$/);
 });
 
 test("quotes Series 850 fixed tilt from the current product sheet rules", () => {
@@ -177,6 +228,11 @@ test("quotes Series 850 fixed tilt from the current product sheet rules", () => 
   assert.equal(gold.price.unitCad, 300.15);
   assert.equal(gold.sku, "M-850FT-24X36-5MM-BRGO-NS-S2");
   assert.match(gold.assets.primaryImageUrl, /BRUSHED-STEEL-GOLD-1\.png$/);
+  assert.deepEqual(gold.assets.gallery, [
+    "https://saddlebrown-turkey-900185.hostingersite.com/Images/SERIES_850FT_PICTURE_URL_LOWER_CASE-BRUSHED-STEEL-GOLD-1.png",
+    "https://saddlebrown-turkey-900185.hostingersite.com/Images/SERIES_850FT_PICTURE_URL_LOWER_CASE-BRUSHED-STEEL-GOLD-2.png",
+    "https://saddlebrown-turkey-900185.hostingersite.com/Images/SERIES_850FT_PICTURE_URL_LOWER_CASE-BRUSHED-STEEL-GOLD-4.png",
+  ]);
 });
 
 test("exposes dynamic field schemas for non-frameless calculators", () => {

@@ -61,11 +61,11 @@ export const SHELF_FINISHES = [
 ];
 
 export const KICK_PLATE_ITEMS = [
-  { label: "18 Gauge #4 Brush", imageLabel: "18ga Brushed Steel", abbreviation: "18G", psf: 27.75, add: 0 },
-  { label: "16 Gauge #4 Brush", imageLabel: "16ga Brushed Steel", abbreviation: "16G", psf: 31.21875, add: 0.125 },
-  { label: "16 Gauge Brush Gold", imageLabel: "16ga Brushed Gold", abbreviation: "16G-GOLD", psf: 35.12109375, add: 0.265625 },
-  { label: "16 Gauge Brush Bronze", imageLabel: "16ga Brushed Bronze", abbreviation: "16G-BRONZE", psf: 35.12109375, add: 0.265625 },
-  { label: "16 Gauge Brush Black", imageLabel: "16ga Brushed Black", abbreviation: "16G-BLACK", psf: 35.12109375, add: 0.265625 },
+  { label: "18GA Brushed Steel", imageLabel: "18ga Brushed Steel", abbreviation: "18G", psf: 27.75, add: 0 },
+  { label: "16GA Brushed Steel", imageLabel: "16ga Brushed Steel", abbreviation: "16G", psf: 31.21875, add: 0.125 },
+  { label: "16GA Brushed Gold", imageLabel: "16ga Brushed Gold", abbreviation: "16G-GOLD", psf: 35.12109375, add: 0.265625 },
+  { label: "16GA Brushed Bronze", imageLabel: "16ga Brushed Bronze", abbreviation: "16G-BRONZE", psf: 35.12109375, add: 0.265625 },
+  { label: "16GA Brushed Black", imageLabel: "16ga Brushed Black", abbreviation: "16G-BLACK", psf: 35.12109375, add: 0.265625 },
 ];
 
 export const KICK_PLATE_EXTRAS = [

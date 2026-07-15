@@ -183,7 +183,6 @@
   width: min(360px, 100%);
   aspect-ratio: 1;
   object-fit: contain;
-  background: url("/assets/frameless-mirror-placeholder.svg") center / contain no-repeat;
 }
 
 .sm-thumb {
@@ -198,7 +197,6 @@
   width: 42px;
   height: 42px;
   object-fit: contain;
-  background: url("/assets/frameless-mirror-placeholder.svg") center / contain no-repeat;
 }
 
 .sm-gallery {
@@ -228,7 +226,6 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: url("/assets/frameless-mirror-placeholder.svg") center / contain no-repeat;
 }
 
 .sm-docs {
