@@ -522,9 +522,9 @@ function calculateUGuards(input = {}) {
 
 function calculateCornerGuards(input = {}) {
   const guard = findByLabel(GUARD_ITEMS, input.guard);
-  const wing1 = numberOrZero(input.wing1);
-  const wing2 = numberOrZero(input.wing2);
-  const length = numberOrZero(input.length);
+  const wing1 = dimensionValue(input, "wing1");
+  const wing2 = dimensionValue(input, "wing2");
+  const length = dimensionValue(input, "length");
   const angle = numberOrZero(input.angle || 90);
   if (wing1 < 0.5 || wing2 < 0.5 || wing1 > 12 || wing2 > 12 || length < 4 || length > 120) {
     return unavailable("Size outside min/max allowed");
@@ -874,6 +874,19 @@ const U_GUARD_SWATCHES = GUARD_ITEMS.map((item) => ({
   label: item.label,
   imageUrl: WORKBOOK_IMAGE_ASSETS.u_guard.variants[item.label]?.primaryImageUrl || FALLBACK_IMAGE_URL,
 }));
+
+const CORNER_GUARD_SWATCHES = GUARD_ITEMS.map((item) => ({
+  value: item.label,
+  label: item.label,
+  imageUrl: WORKBOOK_IMAGE_ASSETS.corner_guard.variants[item.label]?.primaryImageUrl || FALLBACK_IMAGE_URL,
+}));
+
+const QUARTER_FRACTION_OPTIONS = [
+  ["0", "0"],
+  ["0.25", "1/4"],
+  ["0.5", "1/2"],
+  ["0.75", "3/4"],
+];
 
 const CATALOG_OPTION_OVERRIDES = {
   series_850: {
@@ -1505,10 +1518,10 @@ const CUSTOM_CONFIGS = {
   corner_guard: {
     label: "Corner Guards",
     fields: [
-      { name: "wing1", label: "Wing 1", control: "number", default: 2, min: 0.5, max: 12, step: 0.0625 },
-      { name: "wing2", label: "Wing 2", control: "number", default: 2, min: 0.5, max: 12, step: 0.0625 },
-      { name: "length", label: "Length", control: "number", default: 72, min: 4, max: 120, step: 0.0625 },
-      { name: "guard", label: "Guard", control: "select", options: GUARD_ITEMS.map((item) => item.label), default: "18ga Brushed Steel" },
+      { name: "wing1", label: "Wing 1", control: "dimension", defaultInches: 2, min: 0.5, max: 12, fractionOptions: QUARTER_FRACTION_OPTIONS },
+      { name: "wing2", label: "Wing 2", control: "dimension", defaultInches: 2, min: 0.5, max: 12, fractionOptions: QUARTER_FRACTION_OPTIONS },
+      { name: "length", label: "Length", control: "dimension", defaultInches: 72, min: 4, max: 120, fractionOptions: QUARTER_FRACTION_OPTIONS },
+      { name: "guard", label: "Guard", control: "swatch", options: GUARD_ITEMS.map((item) => item.label), swatches: CORNER_GUARD_SWATCHES, default: "18ga Brushed Steel" },
       { name: "easedEdge", label: "Eased Edge Y/N", control: "select", options: ["Yes", "No"], default: "No" },
       { name: "holes", label: "Holes Y/N", control: "select", options: ["Yes", "No", "Countersunk"], default: "No" },
       { name: "tape", label: "Tape Y/N", control: "select", options: ["Yes", "No"], default: "No" },

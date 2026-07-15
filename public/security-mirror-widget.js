@@ -39,13 +39,6 @@
     return Number(value || 0).toFixed(2);
   }
 
-  function createOption(value, label) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label || value;
-    return option;
-  }
-
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -57,6 +50,16 @@
   function optionMarkup(values) {
     return values
       .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+      .join("");
+  }
+
+  function fractionOptionMarkup(field) {
+    return (field.fractionOptions || fractionOptions)
+      .map((option) => {
+        const value = Array.isArray(option) ? option[0] : option.value ?? option;
+        const label = Array.isArray(option) ? option[1] : option.label ?? value;
+        return `<option value="${escapeHtml(value)}">${escapeHtml(label || value)}</option>`;
+      })
       .join("");
   }
 
@@ -205,7 +208,7 @@
           </div>
           <div class="sm-number-pair">
             <span>Fraction</span>
-            <select data-sm-field="${escapeHtml(fractionName)}" data-sm-fraction="true"></select>
+            <select data-sm-field="${escapeHtml(fractionName)}" data-sm-fraction="true">${fractionOptionMarkup(field)}</select>
           </div>
         </div>
       `;
@@ -389,9 +392,6 @@
       </section>
     `;
 
-    root.querySelectorAll("[data-sm-fraction='true']").forEach((select) => {
-      for (const [value, label] of fractionOptions) select.append(createOption(value, label));
-    });
     for (const field of fields) {
       if (field.control !== "select" || field.default === undefined) continue;
       const select = qs(root, `[data-sm-field='${field.name}']`);

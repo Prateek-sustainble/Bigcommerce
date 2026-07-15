@@ -108,6 +108,21 @@ test("quotes workbook guard profiles", () => {
     tape: "No Tape",
     angle: 90,
   });
+  const cornerGuardWithFractionInputs = calculateQuote({
+    type: "corner_guard",
+    customerGroup: "Guest",
+    wing1Inches: 2,
+    wing1Fraction: 0.25,
+    wing2Inches: 2,
+    wing2Fraction: 0.75,
+    lengthInches: 72,
+    lengthFraction: 0.5,
+    guard: "16ga Brushed Black",
+    easedEdge: "No",
+    holes: "No",
+    tape: "No",
+    angle: 90,
+  });
   const jMould = calculateQuote({
     type: "j_mould",
     customerGroup: "Guest",
@@ -127,6 +142,11 @@ test("quotes workbook guard profiles", () => {
   assert.equal(uGuardImageExample.price.unitCad, 108.34);
   assert.match(uGuardImageExample.assets.primaryImageUrl, /U_GUARDS_16GA_BRUSHED_STEEL-1\.png$/);
   assert.equal(cornerGuard.price.unitCad, 50.25);
+  assert.equal(cornerGuardWithFractionInputs.price.unitCad, 81.08);
+  assert.equal(cornerGuardWithFractionInputs.selections.wing1, 2.25);
+  assert.equal(cornerGuardWithFractionInputs.selections.wing2, 2.75);
+  assert.equal(cornerGuardWithFractionInputs.selections.length, 72.5);
+  assert.match(cornerGuardWithFractionInputs.assets.primaryImageUrl, /CORNER_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
   assert.equal(jMould.price.unitCad, 26.25);
 });
 
@@ -163,6 +183,45 @@ test("U Guard config uses fraction dimensions and material image swatches", () =
   ]);
   assert.match(guard.swatches[0].imageUrl, /U_GUARDS_18GA_BRUSHED_STEEL-1\.png$/);
   assert.match(guard.swatches[5].imageUrl, /U_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
+});
+
+test("Corner Guard config uses quarter fractions and material image swatches", () => {
+  const config = getCalculatorPublicConfig("corner_guard");
+  const wing1 = config.fields.find((field) => field.name === "wing1");
+  const wing2 = config.fields.find((field) => field.name === "wing2");
+  const length = config.fields.find((field) => field.name === "length");
+  const guard = config.fields.find((field) => field.name === "guard");
+  const quarterFractions = [
+    ["0", "0"],
+    ["0.25", "1/4"],
+    ["0.5", "1/2"],
+    ["0.75", "3/4"],
+  ];
+
+  assert.equal(wing1.control, "dimension");
+  assert.equal(wing1.defaultInches, 2);
+  assert.equal(wing1.min, 0.5);
+  assert.equal(wing1.max, 12);
+  assert.deepEqual(wing1.fractionOptions, quarterFractions);
+  assert.equal(wing2.control, "dimension");
+  assert.deepEqual(wing2.fractionOptions, quarterFractions);
+  assert.equal(length.control, "dimension");
+  assert.equal(length.defaultInches, 72);
+  assert.equal(length.min, 4);
+  assert.equal(length.max, 120);
+  assert.deepEqual(length.fractionOptions, quarterFractions);
+  assert.equal(guard.control, "swatch");
+  assert.equal(guard.swatches.length, 6);
+  assert.deepEqual(guard.options, [
+    "18ga Brushed Steel",
+    "16ga Brushed Steel",
+    "20ga Mirror Steel",
+    "16ga Brushed Gold",
+    "16ga Brushed Bronze",
+    "16ga Brushed Black",
+  ]);
+  assert.match(guard.swatches[0].imageUrl, /CORNER_GUARDS_18GA_BRUSHED_STEEL-1\.png$/);
+  assert.match(guard.swatches[5].imageUrl, /CORNER_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
 });
 
 test("quotes antique mirror workbook default", () => {
