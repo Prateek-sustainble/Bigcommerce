@@ -634,6 +634,74 @@ function catalogConfig(type) {
   };
 }
 
+function series850Config() {
+  const swatchConfig = CATALOG_SWATCH_FIELDS.series_850.frameFinishing;
+  return {
+    type: "series_850",
+    label: SKU_CATALOG.series_850.label,
+    customerGroups: STANDARD_CUSTOMER_GROUP_OPTIONS,
+    fields: [
+      {
+        name: "width",
+        label: "Width",
+        control: "dimension",
+        defaultInches: 24,
+        min: 12,
+        max: 96,
+        hiddenWhen: { field: "glazing", value: "6mm Tempered" },
+      },
+      {
+        name: "height",
+        label: "Height",
+        control: "dimension",
+        defaultInches: 36,
+        min: 12,
+        max: 96,
+        hiddenWhen: { field: "glazing", value: "6mm Tempered" },
+      },
+      {
+        name: "temperedSize",
+        label: "Size",
+        control: "select",
+        options: SERIES_850_TEMPERED_SIZE_OPTIONS,
+        default: "24x36",
+        visibleWhen: { field: "glazing", value: "6mm Tempered" },
+      },
+      {
+        name: "glazing",
+        label: "Glazing",
+        control: "select",
+        options: SERIES_850_GLAZING_OPTIONS,
+        default: "5mm Standard",
+      },
+      {
+        name: "frameFinishing",
+        label: "Frame Finishing",
+        control: "swatch",
+        options: swatchConfig.swatches.map((swatch) => swatch.value),
+        swatches: swatchConfig.swatches,
+        default: "Stainless Steel Channel Frame",
+      },
+      {
+        name: "shelf",
+        label: "Shelf",
+        control: "select",
+        options: ["No Shelf", "Standard Shelf"],
+        default: "No Shelf",
+      },
+      {
+        name: "packaging",
+        label: "Packaging",
+        control: "select",
+        options: STANDARD_PACKAGING_OPTIONS,
+        default: "Standard Packaging",
+      },
+    ],
+    fallbackImageUrl: FALLBACK_IMAGE_URL,
+    datasheets: datasheets("series_850"),
+  };
+}
+
 const MIRROR_GLAZING_OPTIONS = [
   "5mm Standard",
   "6mm Mirror",
@@ -988,33 +1056,135 @@ const SERIES_850_FRAME_SURCHARGES = {
   "Brushed Steel Black": 0.15,
 };
 
+const SERIES_850_TEMPERED_SIZES = [
+  { width: 18, height: 24 },
+  { width: 18, height: 30 },
+  { width: 18, height: 36 },
+  { width: 24, height: 30 },
+  { width: 24, height: 36 },
+  { width: 24, height: 48 },
+  { width: 24, height: 60 },
+  { width: 24, height: 72 },
+  { width: 36, height: 36 },
+  { width: 36, height: 48 },
+  { width: 36, height: 72 },
+];
+
+const SERIES_850_TEMPERED_SIZE_OPTIONS = SERIES_850_TEMPERED_SIZES.map(({ width, height }) => `${width}x${height}`);
+
+const SERIES_850_GLAZING = {
+  "5mm Standard": { code: "5MM", psfAdd: 0 },
+  "6mm Mirror": { code: "6MM", psfAdd: 3.15 },
+  "6mm Tempered": { code: "6MMT", psfAdd: 31.85 },
+  "S/S Mirror": { code: "SSGL", psfAdd: 39.5 },
+  "3mm Acrylic": { code: "3MMA", psfAdd: 22 },
+  "6mm Acrylic": { code: "6MMA", psfAdd: 39.5 },
+  "5mm w/ Shatter Stop": { code: "5SHS", psfAdd: 7.25 },
+};
+
+const SERIES_850_SHELF = {
+  "No Shelf": { code: "NS", multiplier: 0 },
+  "Standard Shelf": { code: "SH", multiplier: 1.5 },
+};
+
+const SERIES_850_PACKAGING = {
+  "Standard Packaging": { code: "S2", addCad: 0 },
+  "Standard 1 Per Box": { code: "C1", addCad: 12 },
+};
+
 function roundToQuarter(value) {
   return Math.round((Number(value) + Number.EPSILON) / 0.25) * 0.25;
 }
 
-function calculateSeries850CatalogQuote(catalog, input = {}) {
-  const candidate = catalog.rows.find((row) =>
-    catalog.fields.every((field) =>
-      field === "frameFinishing" || valuesEqual(row.options[field], input[field], field),
-    ),
-  );
-  if (!candidate) return unavailable("No matching workbook SKU price row for the selected options.");
+function resolveSeries850MapOption(options, value, fallbackLabel) {
+  const label = Object.keys(options).find((option) => normalizedOption(option) === normalizedOption(value)) || fallbackLabel;
+  return { label, ...options[label] };
+}
 
+function resolveSeries850Packaging(value) {
+  const normalized = canonicalOption("packaging", value);
+  if (normalized === "standard box" || normalized === "standard packaging") {
+    return { label: "Standard Packaging", ...SERIES_850_PACKAGING["Standard Packaging"] };
+  }
+  if (normalized === "standard 1 per box" || normalized === "courier box") {
+    return { label: "Standard 1 Per Box", ...SERIES_850_PACKAGING["Standard 1 Per Box"] };
+  }
+  return { label: "Standard Packaging", ...SERIES_850_PACKAGING["Standard Packaging"] };
+}
+
+function parseSeries850TemperedSize(value) {
+  const match = String(value || "").match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/i);
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+function resolveSeries850Dimensions(input = {}) {
+  const temperedSize = parseSeries850TemperedSize(input.temperedSize);
+  if (temperedSize) return temperedSize;
+  return {
+    width: dimensionValue(input, "width"),
+    height: dimensionValue(input, "height"),
+  };
+}
+
+function series850TemperedSizeAllowed(width, height) {
+  return SERIES_850_TEMPERED_SIZES.some((size) => size.width === width && size.height === height);
+}
+
+function series850FixedBasePrice(catalog, width, height) {
+  const candidate = catalog.rows.find((row) =>
+    row.options.width === width &&
+    row.options.height === height &&
+    valuesEqual(row.options.glazing, "5mm Standard", "glazing") &&
+    valuesEqual(row.options.frameFinishing, "Stainless Steel Channel Frame", "frameFinishing") &&
+    valuesEqual(row.options.shelf, "No Shelf", "shelf") &&
+    valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
+  );
+  return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
+}
+
+function calculateSeries850CatalogQuote(catalog, input = {}) {
   const frameFinishing = Object.hasOwn(SERIES_850_FRAME_CODES, input.frameFinishing)
     ? input.frameFinishing
-    : candidate.options.frameFinishing;
-  const baseListCad = roundToQuarter(candidate.prices.Guest * 1.04);
+    : "Stainless Steel Channel Frame";
+  const glazing = resolveSeries850MapOption(SERIES_850_GLAZING, input.glazing, "5mm Standard");
+  const shelf = resolveSeries850MapOption(SERIES_850_SHELF, input.shelf, "No Shelf");
+  const packaging = resolveSeries850Packaging(input.packaging);
+  const { width, height } = resolveSeries850Dimensions(input);
+  if (width <= 0 || height <= 0) return unavailable("Width and height are required.");
+
+  const isTempered = normalizedOption(glazing.label) === "6mm tempered";
+  if (isTempered && !series850TemperedSizeAllowed(width, height)) {
+    return unavailable("Tempered glazing is only available in the listed stock sizes.");
+  }
+
+  const normalizedWidth = roundUpToEvenInches(width);
+  const normalizedHeight = roundUpToEvenInches(height);
+  if (normalizedWidth < 12 || normalizedHeight < 12) return unavailable("Size outside min/max allowed");
+  if (normalizedWidth > 96 || normalizedHeight > 96) return unavailable("Size outside min/max allowed");
+  if (normalizedWidth > 48 && normalizedHeight > 48) return unavailable("Size outside min/max allowed");
+
+  const squareFeet = (normalizedWidth * normalizedHeight) / 144;
+  const fixedBaseCad = series850FixedBasePrice(catalog, width, height);
+  const normalBaseCad = 40 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 360);
+  const isOversizeBothSides = normalizedWidth > 36 && normalizedHeight > 36;
+  const oversizeBaseCad = squareFeet * 30.9;
+  const baseListCad = isOversizeBothSides ? oversizeBaseCad : fixedBaseCad || normalBaseCad;
   const frameSurchargeRate = SERIES_850_FRAME_SURCHARGES[frameFinishing] ?? 0;
-  const frameSurchargeCad = baseListCad * frameSurchargeRate;
-  const listCad = baseListCad + frameSurchargeCad;
+  const frameSurchargeBaseCad = fixedBaseCad || normalBaseCad;
+  const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
+  const glazingCad = squareFeet * glazing.psfAdd;
+  const shelfCad = normalizedWidth * shelf.multiplier;
+  const packagingCad = packaging.addCad;
+  const listCad = baseListCad + frameSurchargeCad + glazingCad + shelfCad + packagingCad;
   const price = priceBlock(listCad, input, "series_850");
   const imageConfig = CATALOG_IMAGE_FIELDS.series_850;
   const frameCode = SERIES_850_FRAME_CODES[frameFinishing] || "SSCH";
-  const displayOptions = {
-    ...displayOptionsFromInput(catalog, candidate, input),
-    frameFinishing,
-  };
-  const description = descriptionWithDisplayOptions(candidate.description, candidate.options, displayOptions);
+  const widthLabel = formatDimension(input.widthInches ?? width, input.widthFraction);
+  const heightLabel = formatDimension(input.heightInches ?? height, input.heightFraction);
+  const skuSize = fixedBaseCad ? `${widthLabel}X${heightLabel}` : "CUSTOM";
+  const sku = `M-850-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
+  const description = `850 Series ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
 
   return {
     ok: true,
@@ -1023,19 +1193,35 @@ function calculateSeries850CatalogQuote(catalog, input = {}) {
     customerId: input.customerId ?? null,
     customerGroup: price.customerGroup,
     discountMultiplier: price.discountMultiplier,
-    selections: { ...displayOptions, quantity: price.quantity },
+    selections: {
+      width,
+      height,
+      glazing: glazing.label,
+      frameFinishing,
+      shelf: shelf.label,
+      packaging: packaging.label,
+      ...(isTempered ? { temperedSize: `${width}x${height}` } : {}),
+      quantity: price.quantity,
+    },
     calculation: {
-      source: "workbook_2026_series_850",
-      squareFeet: candidate.squareFeet,
-      lbsPerSquareFoot: candidate.lbsPerSquareFoot,
-      totalLbs: candidate.totalLbs,
+      source: "workbook_2026_series_850_formula",
+      normalizedWidth,
+      normalizedHeight,
+      squareFeet: roundCurrency(squareFeet),
+      fixedBaseCad: fixedBaseCad ? roundCurrency(fixedBaseCad) : null,
+      normalBaseCad: roundCurrency(normalBaseCad),
+      oversizeBaseCad: isOversizeBothSides ? roundCurrency(oversizeBaseCad) : null,
       basePriceCad: roundCurrency(baseListCad),
+      glazingPsfAdd: glazing.psfAdd,
+      glazingCad: roundCurrency(glazingCad),
+      shelfCad: roundCurrency(shelfCad),
+      packagingCad: roundCurrency(packagingCad),
       frameSurchargeRate,
       frameSurchargeCad: roundCurrency(frameSurchargeCad),
       listCadBeforeCustomerDiscount: roundCurrency(listCad),
     },
     price: price.price,
-    sku: candidate.sku.replace("-SSCH-", `-${frameCode}-`),
+    sku,
     description,
     assets: productAssets({
       type: "series_850",
@@ -1154,6 +1340,7 @@ const CUSTOM_CALCULATORS = {
 };
 
 export function getWorkbookPublicConfig(type) {
+  if (type === "series_850") return series850Config();
   if (SKU_CATALOG[type] && type !== "series_3300") return catalogConfig(type);
   const config = CUSTOM_CONFIGS[type] || (type === "series_3300" ? {
     label: "Series 3300 Stainless Steel Mirror",

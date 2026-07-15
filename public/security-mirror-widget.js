@@ -93,6 +93,7 @@
     root.querySelectorAll("[data-sm-field]").forEach((field) => {
       const name = field.dataset.smField;
       if (!name) return;
+      if (field.disabled) return;
       if (field.type === "number") {
         data[name] = Number(field.value);
         return;
@@ -173,16 +174,30 @@
     image.src = imageUrl || fallbackImageUrl;
   }
 
+  function conditionAttributes(field) {
+    const attributes = [];
+    if (field.visibleWhen) {
+      attributes.push(`data-sm-visible-when-field="${escapeHtml(field.visibleWhen.field)}"`);
+      attributes.push(`data-sm-visible-when-value="${escapeHtml(field.visibleWhen.value)}"`);
+    }
+    if (field.hiddenWhen) {
+      attributes.push(`data-sm-hidden-when-field="${escapeHtml(field.hiddenWhen.field)}"`);
+      attributes.push(`data-sm-hidden-when-value="${escapeHtml(field.hiddenWhen.value)}"`);
+    }
+    return attributes.join(" ");
+  }
+
   function renderField(field) {
     const label = escapeHtml(field.label || field.name);
     const defaultValue = field.default ?? "";
+    const condition = conditionAttributes(field);
     if (field.control === "dimension") {
       const min = field.min ?? 0;
       const max = field.max ?? 120;
       const inchesName = `${field.name}Inches`;
       const fractionName = `${field.name}Fraction`;
       return `
-        <div class="sm-dimension-row">
+        <div class="sm-dimension-row" ${condition}>
           <label>${label}</label>
           <div class="sm-number-pair">
             <span>Inches</span>
@@ -197,7 +212,7 @@
     }
     if (field.control === "number") {
       return `
-        <div class="sm-row">
+        <div class="sm-row" ${condition}>
           <label>${label}</label>
           <input data-sm-field="${escapeHtml(field.name)}" type="number" min="${escapeHtml(field.min ?? 0)}" max="${escapeHtml(field.max ?? "")}" step="${escapeHtml(field.step ?? 1)}" value="${escapeHtml(defaultValue)}">
         </div>
@@ -205,7 +220,7 @@
     }
     if (field.control === "swatch") {
       return `
-        <div class="sm-row sm-swatch-row" data-sm-swatch-row="${escapeHtml(field.name)}">
+        <div class="sm-row sm-swatch-row" data-sm-swatch-row="${escapeHtml(field.name)}" ${condition}>
           <label>
             <span>${label}</span>
             <strong data-sm-swatch-label="${escapeHtml(field.name)}">${escapeHtml(defaultValue)}</strong>
@@ -218,11 +233,33 @@
       `;
     }
     return `
-      <div class="sm-row">
+      <div class="sm-row" ${condition}>
         <label>${label}</label>
         <select data-sm-field="${escapeHtml(field.name)}">${optionMarkup(field.options || [])}</select>
       </div>
     `;
+  }
+
+  function conditionMatches(root, fieldName, expectedValue) {
+    const field = qs(root, `[data-sm-field='${fieldName}']`);
+    return String(field?.value ?? "") === String(expectedValue ?? "");
+  }
+
+  function syncConditionalFields(root) {
+    root.querySelectorAll("[data-sm-visible-when-field], [data-sm-hidden-when-field]").forEach((row) => {
+      const visibleField = row.dataset.smVisibleWhenField;
+      const visibleValue = row.dataset.smVisibleWhenValue;
+      const hiddenField = row.dataset.smHiddenWhenField;
+      const hiddenValue = row.dataset.smHiddenWhenValue;
+      const hiddenByVisibleRule = visibleField ? !conditionMatches(root, visibleField, visibleValue) : false;
+      const hiddenByHiddenRule = hiddenField ? conditionMatches(root, hiddenField, hiddenValue) : false;
+      const shouldHide = hiddenByVisibleRule || hiddenByHiddenRule;
+
+      row.hidden = shouldHide;
+      row.querySelectorAll("[data-sm-field]").forEach((field) => {
+        field.disabled = shouldHide;
+      });
+    });
   }
 
   function renderShell(root, config, options) {
@@ -379,6 +416,7 @@
     }
 
     applyAccessMode(root, options);
+    syncConditionalFields(root);
   }
 
   function applyAccessMode(root, options) {
@@ -665,12 +703,19 @@
       response.json(),
     );
     renderShell(root, configResponse.config, options);
-    root.addEventListener("input", () => updateQuote(root, options));
-    root.addEventListener("change", () => updateQuote(root, options));
+    root.addEventListener("input", () => {
+      syncConditionalFields(root);
+      updateQuote(root, options);
+    });
+    root.addEventListener("change", () => {
+      syncConditionalFields(root);
+      updateQuote(root, options);
+    });
     root.addEventListener("click", (event) => {
       const swatchButton = event.target.closest("button[data-sm-swatch-value]");
       if (swatchButton && root.contains(swatchButton)) {
         activateSwatch(root, swatchButton);
+        syncConditionalFields(root);
         updateQuote(root, options);
         return;
       }

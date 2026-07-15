@@ -152,6 +152,78 @@ test("quotes exact SKU catalog products and hidden customer pricing", () => {
   assert.equal(convex.price.unitCad, 64.05);
 });
 
+test("Series 850 uses custom dimensions except for tempered stock sizes", () => {
+  const config = getCalculatorPublicConfig("series_850");
+  const width = config.fields.find((field) => field.name === "width");
+  const height = config.fields.find((field) => field.name === "height");
+  const temperedSize = config.fields.find((field) => field.name === "temperedSize");
+
+  assert.equal(width.control, "dimension");
+  assert.deepEqual(width.hiddenWhen, { field: "glazing", value: "6mm Tempered" });
+  assert.equal(height.control, "dimension");
+  assert.equal(temperedSize.control, "select");
+  assert.deepEqual(temperedSize.visibleWhen, { field: "glazing", value: "6mm Tempered" });
+  assert.deepEqual(temperedSize.options, [
+    "18x24",
+    "18x30",
+    "18x36",
+    "24x30",
+    "24x36",
+    "24x48",
+    "24x60",
+    "24x72",
+    "36x36",
+    "36x48",
+    "36x72",
+  ]);
+
+  const custom = calculateQuote({
+    type: "series_850",
+    customerGroup: "Guest",
+    widthInches: 24,
+    widthFraction: 0.5,
+    heightInches: 36,
+    heightFraction: 0,
+    glazing: "5mm Standard",
+    frameFinishing: "Stainless Steel Channel Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(custom.ok, true);
+  assert.equal(custom.price.unitCad, 186.9);
+  assert.equal(custom.sku, "M-850-CUSTOM-5MM-SSCH-NS-S2");
+
+  const tempered = calculateQuote({
+    type: "series_850",
+    customerGroup: "Guest",
+    temperedSize: "24x60",
+    glazing: "6mm Tempered",
+    frameFinishing: "Stainless Steel Channel Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(tempered.ok, true);
+  assert.equal(tempered.selections.width, 24);
+  assert.equal(tempered.selections.height, 60);
+  assert.equal(tempered.sku, "M-850-CUSTOM-6MMT-SSCH-NS-S2");
+
+  const unavailableTempered = calculateQuote({
+    type: "series_850",
+    customerGroup: "Guest",
+    width: 16,
+    height: 24,
+    glazing: "6mm Tempered",
+    frameFinishing: "Stainless Steel Channel Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(unavailableTempered.ok, false);
+  assert.match(unavailableTempered.message, /listed stock sizes/);
+});
+
 test("quotes Series 3200 and 3200FT against the current workbook list prices", () => {
   const flat = calculateQuote({
     type: "series_3200",
