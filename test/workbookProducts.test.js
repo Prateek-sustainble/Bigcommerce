@@ -68,6 +68,34 @@ test("quotes workbook guard profiles", () => {
     holes: "No Holes",
     tape: "Tape",
   });
+  const uGuardWithFractionInputs = calculateQuote({
+    type: "u_guard",
+    customerGroup: "Guest",
+    wing1Inches: 2,
+    wing1Fraction: 0.5,
+    centerInches: 4,
+    centerFraction: 0.25,
+    wing2Inches: 2,
+    wing2Fraction: 0.125,
+    lengthInches: 72,
+    lengthFraction: 0.9375,
+    guard: "16ga Brushed Steel",
+    easedEdge: "No",
+    holes: "No",
+    tape: "Yes",
+  });
+  const uGuardImageExample = calculateQuote({
+    type: "u_guard",
+    customerGroup: "Guest",
+    wing1Inches: 2,
+    centerInches: 4,
+    wing2Inches: 2,
+    lengthInches: 72,
+    guard: "16ga Brushed Steel",
+    easedEdge: "No",
+    holes: "No",
+    tape: "Yes",
+  });
   const cornerGuard = calculateQuote({
     type: "corner_guard",
     customerGroup: "Guest",
@@ -91,8 +119,50 @@ test("quotes workbook guard profiles", () => {
   });
 
   assert.equal(uGuard.price.unitCad, 95.15);
+  assert.equal(uGuardWithFractionInputs.price.unitCad, 119.29);
+  assert.equal(uGuardWithFractionInputs.selections.wing1, 2.5);
+  assert.equal(uGuardWithFractionInputs.selections.center, 4.25);
+  assert.equal(uGuardWithFractionInputs.selections.wing2, 2.125);
+  assert.equal(uGuardWithFractionInputs.selections.length, 72.9375);
+  assert.equal(uGuardImageExample.price.unitCad, 108.34);
+  assert.match(uGuardImageExample.assets.primaryImageUrl, /U_GUARDS_16GA_BRUSHED_STEEL-1\.png$/);
   assert.equal(cornerGuard.price.unitCad, 50.25);
   assert.equal(jMould.price.unitCad, 26.25);
+});
+
+test("U Guard config uses fraction dimensions and material image swatches", () => {
+  const config = getCalculatorPublicConfig("u_guard");
+  const wing1 = config.fields.find((field) => field.name === "wing1");
+  const center = config.fields.find((field) => field.name === "center");
+  const wing2 = config.fields.find((field) => field.name === "wing2");
+  const length = config.fields.find((field) => field.name === "length");
+  const guard = config.fields.find((field) => field.name === "guard");
+
+  assert.equal(wing1.control, "dimension");
+  assert.equal(wing1.defaultInches, 2);
+  assert.equal(wing1.min, 0);
+  assert.equal(wing1.max, 24);
+  assert.equal(center.control, "dimension");
+  assert.equal(center.defaultInches, 4);
+  assert.equal(center.min, 4);
+  assert.equal(center.max, 12);
+  assert.equal(wing2.control, "dimension");
+  assert.equal(length.control, "dimension");
+  assert.equal(length.defaultInches, 72);
+  assert.equal(length.min, 4);
+  assert.equal(length.max, 120);
+  assert.equal(guard.control, "swatch");
+  assert.equal(guard.swatches.length, 6);
+  assert.deepEqual(guard.options, [
+    "18ga Brushed Steel",
+    "16ga Brushed Steel",
+    "20ga Mirror Steel",
+    "16ga Brushed Gold",
+    "16ga Brushed Bronze",
+    "16ga Brushed Black",
+  ]);
+  assert.match(guard.swatches[0].imageUrl, /U_GUARDS_18GA_BRUSHED_STEEL-1\.png$/);
+  assert.match(guard.swatches[5].imageUrl, /U_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
 });
 
 test("quotes antique mirror workbook default", () => {
