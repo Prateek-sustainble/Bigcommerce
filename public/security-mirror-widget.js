@@ -5,6 +5,7 @@
     type: "frameless_mirror",
     customerGroup: "House",
     customerId: null,
+    contactEmail: "smi@securitymirror.com",
     defaultItem: "",
     hideCustomerField: false,
     hideItemField: false,
@@ -142,6 +143,14 @@
     if (!rawValue) return null;
     const value = Number(rawValue);
     return Number.isFinite(value) ? value : null;
+  }
+
+  function usesGuestPricing(customerGroup) {
+    return (normalizeCustomerGroup(customerGroup) || "Guest") === "Guest";
+  }
+
+  function requiresContactRequest(options) {
+    return !options.customerId || usesGuestPricing(options.customerGroup);
   }
 
   async function requestJson(url, body) {
@@ -284,6 +293,61 @@
           <a data-sm-output="datasheetFr" target="_blank" rel="noreferrer">Datasheet (French)</a>
         </div>
       </div>
+
+      <section class="sm-contact" data-sm-contact-panel hidden>
+        <h3>Please provide your contact information below and one of our representatives will be in touch to assist you with your order.</h3>
+        <form class="sm-contact__form" data-sm-contact-form>
+          <label>
+            <span>Name</span>
+            <input data-sm-contact-field="name" autocomplete="name" required>
+          </label>
+          <label>
+            <span>Street address</span>
+            <input data-sm-contact-field="streetAddress" autocomplete="street-address">
+          </label>
+          <label>
+            <span>Email</span>
+            <input data-sm-contact-field="email" type="email" autocomplete="email" required>
+          </label>
+          <label>
+            <span>City</span>
+            <input data-sm-contact-field="city" autocomplete="address-level2">
+          </label>
+          <label>
+            <span>Company</span>
+            <input data-sm-contact-field="company" autocomplete="organization">
+          </label>
+          <div class="sm-contact__split">
+            <label>
+              <span>Province / State</span>
+              <input data-sm-contact-field="provinceState" autocomplete="address-level1">
+            </label>
+            <label>
+              <span>Postal / Zip Code</span>
+              <input data-sm-contact-field="postalCode" autocomplete="postal-code">
+            </label>
+          </div>
+          <label>
+            <span>Phone</span>
+            <input data-sm-contact-field="phone" type="tel" autocomplete="tel">
+          </label>
+          <label>
+            <span>Country</span>
+            <select data-sm-contact-field="country" autocomplete="country-name">
+              <option value=""></option>
+              <option value="Canada">Canada</option>
+              <option value="United States">United States</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label class="sm-contact__comments">
+            <span>Comments / questions :</span>
+            <textarea data-sm-contact-field="comments" rows="3"></textarea>
+          </label>
+          <output class="sm-contact__status" data-sm-output="contactStatus"></output>
+          <button class="sm-request" type="submit" data-sm-action="request">Request</button>
+        </form>
+      </section>
     `;
 
     root.querySelectorAll("[data-sm-fraction='true']").forEach((select) => {
@@ -313,6 +377,22 @@
       const itemSelect = qs(root, "[data-sm-field='item']");
       if (itemSelect) itemSelect.setAttribute("disabled", "disabled");
     }
+
+    applyAccessMode(root, options);
+  }
+
+  function applyAccessMode(root, options) {
+    const contactRequired = requiresContactRequest(options);
+    const addButton = qs(root, "[data-sm-action='add']");
+    const contactPanel = qs(root, "[data-sm-contact-panel]");
+
+    root.dataset.smContactRequired = contactRequired ? "true" : "false";
+    if (contactPanel) contactPanel.hidden = !contactRequired;
+    if (!addButton) return;
+
+    addButton.disabled = contactRequired;
+    addButton.classList.toggle("sm-add--contact-required", contactRequired);
+    addButton.title = contactRequired ? "Please submit your contact information to proceed." : "";
   }
 
   function applyQuote(root, quote) {
@@ -323,7 +403,7 @@
       return;
     }
 
-    qs(root, "[data-sm-action='add']").disabled = false;
+    qs(root, "[data-sm-action='add']").disabled = requiresContactRequest(root.smOptions || {}) ? true : false;
     qs(root, "[data-sm-output='status']").textContent = "";
     qs(root, "[data-sm-output='unitCad']").textContent = money(quote.price.unitCad);
     qs(root, "[data-sm-output='unitUsd']").textContent = money(quote.price.unitUsd);
@@ -436,6 +516,12 @@
   }
 
   async function addToCart(root, options) {
+    if (requiresContactRequest(options)) {
+      qs(root, "[data-sm-output='status']").textContent = "Please submit your contact information below to proceed.";
+      applyAccessMode(root, options);
+      return;
+    }
+
     const button = qs(root, "[data-sm-action='add']");
     button.disabled = true;
     button.textContent = "Adding...";
@@ -457,6 +543,85 @@
     } finally {
       button.disabled = false;
       button.textContent = "Add to cart";
+    }
+  }
+
+  function contactPayload(root, options) {
+    const contact = {};
+    root.querySelectorAll("[data-sm-contact-field]").forEach((field) => {
+      contact[field.dataset.smContactField] = field.value || "";
+    });
+
+    return {
+      contact,
+      pageUrl: window.location.href,
+      customerId: options.customerId ?? null,
+      customerGroup: options.customerGroup || "Guest",
+      calculator: payload(root, options),
+      calculation: root.smLastQuote || null,
+    };
+  }
+
+  function emailBodyForRequest(root, options) {
+    const request = contactPayload(root, options);
+    const calculation = request.calculation || {};
+    const lines = [
+      "Security Mirror order assistance request",
+      "",
+      "Contact",
+      `Name: ${request.contact.name || ""}`,
+      `Email: ${request.contact.email || ""}`,
+      `Company: ${request.contact.company || ""}`,
+      `Phone: ${request.contact.phone || ""}`,
+      `Street address: ${request.contact.streetAddress || ""}`,
+      `City: ${request.contact.city || ""}`,
+      `Province / State: ${request.contact.provinceState || ""}`,
+      `Postal / Zip Code: ${request.contact.postalCode || ""}`,
+      `Country: ${request.contact.country || ""}`,
+      "",
+      "Comments / questions",
+      request.contact.comments || "",
+      "",
+      "Calculator details",
+      `Page: ${request.pageUrl}`,
+      `Customer group: ${request.customerGroup}`,
+      `Calculator type: ${request.calculator.type || ""}`,
+      `SKU: ${calculation.sku || ""}`,
+      `Description: ${calculation.description || ""}`,
+      `Price CAD: ${calculation.price?.subtotalCad ?? ""}`,
+      `Price USD: ${calculation.price?.subtotalUsd ?? ""}`,
+      `Selections: ${JSON.stringify(calculation.selections || request.calculator)}`,
+    ];
+    return lines.join("\n");
+  }
+
+  function openEmailFallback(root, options) {
+    const subject = encodeURIComponent("Security Mirror order assistance request");
+    const body = encodeURIComponent(emailBodyForRequest(root, options));
+    window.location.href = `mailto:${options.contactEmail}?subject=${subject}&body=${body}`;
+  }
+
+  async function submitContactRequest(root, options) {
+    const form = qs(root, "[data-sm-contact-form]");
+    const status = qs(root, "[data-sm-output='contactStatus']");
+    const button = qs(root, "[data-sm-action='request']");
+    if (!form.reportValidity()) return;
+
+    button.disabled = true;
+    status.textContent = "Sending...";
+    try {
+      const response = await requestJson(`${options.apiBase}/api/contact/request`, contactPayload(root, options));
+      status.textContent = response.message || "Thank you. We received your request.";
+      form.reset();
+    } catch (error) {
+      if (error.status === "contact_request_not_configured") {
+        status.textContent = "Opening your email app to send the request.";
+        openEmailFallback(root, { ...options, contactEmail: error.recipient || options.contactEmail });
+      } else {
+        status.textContent = error.message || "Unable to send. Please try again.";
+      }
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -494,6 +659,7 @@
         Boolean((userOptions || {}).hideCustomerField) ||
         Boolean((userOptions || {}).lockCustomerGroup),
     };
+    root.smOptions = options;
 
     const configResponse = await fetch(`${options.apiBase}/api/calculator/config?type=${options.type}`).then((response) =>
       response.json(),
@@ -514,6 +680,10 @@
       activateGalleryImage(root, button.dataset.smGalleryUrl, root.dataset.smFallbackImageUrl);
     });
     qs(root, "[data-sm-action='add']").addEventListener("click", () => addToCart(root, options));
+    qs(root, "[data-sm-contact-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitContactRequest(root, options);
+    });
     await updateQuote(root, options);
   }
 

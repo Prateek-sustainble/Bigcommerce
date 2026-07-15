@@ -172,6 +172,10 @@
   cursor: not-allowed;
 }
 
+.sm-add--contact-required {
+  display: none;
+}
+
 .sm-calculator__media {
   display: grid;
   justify-items: center;
@@ -246,6 +250,82 @@
   padding: 9px 14px;
 }
 
+.sm-contact {
+  grid-column: 1 / -1;
+  margin-top: 20px;
+  border-radius: 16px;
+  background: #efede7;
+  padding: clamp(24px, 3vw, 34px);
+}
+
+.sm-contact h3 {
+  margin: 0 0 24px;
+  color: var(--sm-ink);
+  font-size: clamp(22px, 2.1vw, 32px);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.sm-contact__form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px clamp(28px, 6vw, 96px);
+}
+
+.sm-contact label {
+  display: grid;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.sm-contact input,
+.sm-contact select,
+.sm-contact textarea {
+  min-height: 42px;
+  border: 1px solid #c9c8c2;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.sm-contact textarea {
+  resize: vertical;
+}
+
+.sm-contact__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.sm-contact__comments,
+.sm-contact__status {
+  grid-column: 1 / -1;
+}
+
+.sm-contact__status {
+  min-height: 20px;
+  color: var(--sm-ink);
+  font-weight: 600;
+}
+
+.sm-request {
+  justify-self: end;
+  min-width: 150px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--sm-accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  padding: 12px 24px;
+  cursor: pointer;
+}
+
+.sm-request:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 @media (max-width: 760px) {
   .sm-calculator {
     grid-template-columns: 1fr;
@@ -270,5 +350,14 @@
 
   .sm-swatch-row label strong {
     max-width: 100%;
+  }
+
+  .sm-contact__form,
+  .sm-contact__split {
+    grid-template-columns: 1fr;
+  }
+
+  .sm-request {
+    justify-self: stretch;
   }
 }

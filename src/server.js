@@ -2,6 +2,7 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { canAddCalculatedItemToCart } from "./access.js";
 import { addQuoteToBigCommerceCart } from "./bigcommerce.js";
 import { createQuoteToken, verifyQuoteMatchesToken, verifyQuoteToken } from "./quoteToken.js";
 import { calculateQuote, getCalculatorPublicConfig, getSupportedCalculatorTypes } from "./calculators/index.js";
@@ -15,6 +16,8 @@ const allowedOrigins = (process.env.ALLOWED_ORIGIN || "*")
   .filter(Boolean);
 const quoteSigningSecret = process.env.QUOTE_SIGNING_SECRET || "dev-quote-secret-change-me";
 const requireQuoteToken = process.env.REQUIRE_QUOTE_TOKEN === "true";
+const contactRequestWebhookUrl = process.env.CONTACT_REQUEST_WEBHOOK_URL || "";
+const contactRequestRecipient = process.env.CONTACT_REQUEST_EMAIL_TO || "smi@securitymirror.com";
 const isProduction = process.env.NODE_ENV === "production";
 
 if (isProduction && quoteSigningSecret === "dev-quote-secret-change-me") {
@@ -79,6 +82,52 @@ function signedQuoteResponse(quote) {
   return { ...quote, quoteToken };
 }
 
+function cleanText(value, maxLength = 1000) {
+  return String(value ?? "").trim().slice(0, maxLength);
+}
+
+function cleanContactRequest(payload) {
+  const contact = payload.contact || {};
+  return {
+    submittedAt: new Date().toISOString(),
+    pageUrl: cleanText(payload.pageUrl, 2000),
+    customerId: payload.customerId ?? payload.calculator?.customerId ?? null,
+    customerGroup: cleanText(payload.customerGroup || payload.calculator?.customerGroup || "Guest", 100),
+    contact: {
+      name: cleanText(contact.name, 200),
+      email: cleanText(contact.email, 320),
+      company: cleanText(contact.company, 200),
+      phone: cleanText(contact.phone, 80),
+      streetAddress: cleanText(contact.streetAddress, 300),
+      city: cleanText(contact.city, 120),
+      provinceState: cleanText(contact.provinceState, 120),
+      postalCode: cleanText(contact.postalCode, 40),
+      country: cleanText(contact.country, 120),
+      comments: cleanText(contact.comments, 4000),
+    },
+    calculator: payload.calculator || {},
+    calculation: payload.calculation || null,
+  };
+}
+
+async function forwardContactRequest(request) {
+  if (!contactRequestWebhookUrl) return false;
+
+  const response = await fetch(contactRequestWebhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = new Error(`Contact request webhook failed with status ${response.status}.`);
+    error.status = 502;
+    throw error;
+  }
+
+  return true;
+}
+
 async function serveStatic(req, res, url) {
   const relativePath = url.pathname === "/" ? "demo.html" : url.pathname.slice(1);
   const resolvedPath = path.resolve(publicDir, relativePath);
@@ -139,6 +188,43 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/contact/request") {
+    const payload = await readJson(req);
+    const contactRequest = cleanContactRequest(payload);
+
+    if (!contactRequest.contact.name || !contactRequest.contact.email) {
+      sendJson(req, res, 400, {
+        ok: false,
+        status: "contact_required_fields_missing",
+        message: "Name and email are required.",
+      });
+      return;
+    }
+
+    if (!contactRequest.calculation) {
+      const calculation = quoteForPayload(contactRequest.calculator);
+      if (calculation.ok) contactRequest.calculation = calculation;
+    }
+
+    const forwarded = await forwardContactRequest(contactRequest);
+    if (!forwarded) {
+      sendJson(req, res, 501, {
+        ok: false,
+        status: "contact_request_not_configured",
+        message: "Automatic request delivery is not configured.",
+        recipient: contactRequestRecipient,
+      });
+      return;
+    }
+
+    sendJson(req, res, 200, {
+      ok: true,
+      status: "contact_request_received",
+      message: "Thank you. We received your request.",
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/cart/add") {
     const payload = await readJson(req);
     const quote = quoteForPayload(payload);
@@ -173,6 +259,16 @@ async function handleApi(req, res, url) {
         ok: false,
         status: "quote_token_required",
         message: "quoteToken is required for add-to-cart.",
+      });
+      return;
+    }
+
+    if (!canAddCalculatedItemToCart({ customerId: payload.customerId, customerGroup: quote.customerGroup })) {
+      sendJson(req, res, 403, {
+        ok: false,
+        status: "contact_request_required",
+        message: "Guest-priced calculators cannot be added to cart. Please submit the contact form.",
+        quote: signedQuoteResponse(quote),
       });
       return;
     }
