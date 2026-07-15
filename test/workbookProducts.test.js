@@ -295,6 +295,26 @@ test("Corner Guard config uses quarter fractions and material image swatches", (
   assert.equal(guard.swatches[0].imageUrl, undefined);
 });
 
+test("Kick Plate config uses material finish swatches", () => {
+  const config = getCalculatorPublicConfig("kick_plates");
+  const item = config.fields.find((field) => field.name === "item");
+
+  assert.equal(item.control, "swatch");
+  assert.equal(item.swatches.length, 5);
+  assert.deepEqual(item.options, [
+    "18GA Brushed Steel",
+    "16GA Brushed Steel",
+    "16GA Brushed Gold",
+    "16GA Brushed Bronze",
+    "16GA Brushed Black",
+  ]);
+  assert.equal(item.swatches[0].value, "18GA Brushed Steel");
+  assert.match(item.swatches[0].color, /linear-gradient/);
+  assert.equal(item.swatches[4].value, "16GA Brushed Black");
+  assert.match(item.swatches[4].color, /#111111/);
+  assert.equal(item.swatches[0].imageUrl, undefined);
+});
+
 test("quotes antique mirror workbook default", () => {
   const quote = calculateQuote({
     type: "antique",

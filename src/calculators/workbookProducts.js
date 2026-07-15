@@ -908,6 +908,20 @@ const GUARD_MATERIAL_SWATCHES = [
 const U_GUARD_SWATCHES = GUARD_MATERIAL_SWATCHES;
 const CORNER_GUARD_SWATCHES = GUARD_MATERIAL_SWATCHES;
 
+const KICK_PLATE_SWATCH_COLORS = {
+  "18GA Brushed Steel": "linear-gradient(135deg, #707276 0%, #d5d7d6 48%, #8f9290 100%)",
+  "16GA Brushed Steel": "linear-gradient(135deg, #626568 0%, #c7caca 48%, #777a7b 100%)",
+  "16GA Brushed Gold": "linear-gradient(135deg, #8b6a23 0%, #d6b44c 50%, #f2dda0 100%)",
+  "16GA Brushed Bronze": "linear-gradient(135deg, #704534 0%, #bd927a 50%, #dbc0ad 100%)",
+  "16GA Brushed Black": "linear-gradient(135deg, #111111 0%, #393837 50%, #171716 100%)",
+};
+
+const KICK_PLATE_SWATCHES = KICK_PLATE_ITEMS.map((item) => ({
+  value: item.label,
+  label: item.label,
+  color: KICK_PLATE_SWATCH_COLORS[item.label],
+}));
+
 const QUARTER_FRACTION_OPTIONS = [
   ["0", "0"],
   ["0.25", "1/4"],
@@ -1511,7 +1525,7 @@ const CUSTOM_CONFIGS = {
   kick_plates: {
     label: "Kick Plates",
     fields: [
-      { name: "item", label: "Finishing", control: "select", options: KICK_PLATE_ITEMS.map((item) => item.label), default: "18GA Brushed Steel" },
+      { name: "item", label: "Finishing", control: "swatch", options: KICK_PLATE_ITEMS.map((item) => item.label), swatches: KICK_PLATE_SWATCHES, default: "18GA Brushed Steel" },
       { name: "width", label: "Width", control: "dimension", defaultInches: 48, min: 6, max: 96 },
       { name: "height", label: "Height", control: "dimension", defaultInches: 6, min: 6, max: 96 },
       { name: "holesTape", label: "Holes/Tape", control: "select", options: KICK_PLATE_EXTRAS.map((item) => item.label), default: "No Holes | No Tape" },
