@@ -256,6 +256,8 @@
       const shouldHide = hiddenByVisibleRule || hiddenByHiddenRule;
 
       row.hidden = shouldHide;
+      row.classList.toggle("sm-row--hidden", shouldHide);
+      row.setAttribute("aria-hidden", shouldHide ? "true" : "false");
       row.querySelectorAll("[data-sm-field]").forEach((field) => {
         field.disabled = shouldHide;
       });

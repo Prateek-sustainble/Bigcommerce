@@ -131,8 +131,9 @@
   background: linear-gradient(180deg, #fff, #fbfbfc);
 }
 
+.sm-calculator [hidden],
 .sm-row--hidden {
-  display: none;
+  display: none !important;
 }
 
 .sm-code {
