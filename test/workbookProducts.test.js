@@ -258,6 +258,76 @@ test("quotes Series 3200 and 3200FT against the current workbook list prices", (
   assert.match(fixedTilt.description, /Brushed Stainless Steel Fixed Tilt Frame No Shelf Standard Packaging$/);
 });
 
+test("Series 3200 uses custom dimensions except for tempered stock sizes", () => {
+  const config = getCalculatorPublicConfig("series_3200");
+  const width = config.fields.find((field) => field.name === "width");
+  const height = config.fields.find((field) => field.name === "height");
+  const temperedSize = config.fields.find((field) => field.name === "temperedSize");
+
+  assert.equal(width.control, "dimension");
+  assert.deepEqual(width.hiddenWhen, { field: "glazing", value: "6mm Tempered" });
+  assert.equal(height.control, "dimension");
+  assert.deepEqual(height.hiddenWhen, { field: "glazing", value: "6mm Tempered" });
+  assert.equal(temperedSize.control, "select");
+  assert.deepEqual(temperedSize.visibleWhen, { field: "glazing", value: "6mm Tempered" });
+  assert.deepEqual(temperedSize.options, [
+    "18x24",
+    "18x30",
+    "18x36",
+    "24x30",
+    "24x36",
+    "24x48",
+  ]);
+
+  const custom = calculateQuote({
+    type: "series_3200",
+    customerGroup: "Guest",
+    widthInches: 24,
+    widthFraction: 0.5,
+    heightInches: 36,
+    heightFraction: 0,
+    glazing: "5mm Standard",
+    frameFinishing: "Brushed Stainless Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(custom.ok, true);
+  assert.equal(custom.price.unitCad, 297.6);
+  assert.equal(custom.sku, "M-3200-CUSTOM-5MM-N4SS-NS-S2");
+  assert.match(custom.description, /24-1\/2"x36" 5mm Standard/);
+
+  const tempered = calculateQuote({
+    type: "series_3200",
+    customerGroup: "Guest",
+    temperedSize: "24x36",
+    glazing: "6mm Tempered",
+    frameFinishing: "Brushed Stainless Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(tempered.ok, true);
+  assert.equal(tempered.price.unitCad, 421.35);
+  assert.equal(tempered.selections.width, 24);
+  assert.equal(tempered.selections.height, 36);
+  assert.equal(tempered.sku, "M-3200-24X36-6MMT-N4SS-NS-S2");
+
+  const unavailableTempered = calculateQuote({
+    type: "series_3200",
+    customerGroup: "Guest",
+    width: 16,
+    height: 24,
+    glazing: "6mm Tempered",
+    frameFinishing: "Brushed Stainless Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(unavailableTempered.ok, false);
+  assert.match(unavailableTempered.message, /listed stock sizes/);
+});
+
 test("quotes Series 850 fixed tilt from the current product sheet rules", () => {
   const quote = calculateQuote({
     type: "series_850_ft",

@@ -702,6 +702,37 @@ function series850Config() {
   };
 }
 
+function series3200Config() {
+  const config = catalogConfig("series_3200");
+  const temperedSizeField = {
+    name: "temperedSize",
+    label: "Size",
+    control: "select",
+    options: SERIES_3200_TEMPERED_SIZE_OPTIONS,
+    default: "24x36",
+    visibleWhen: { field: "glazing", value: "6mm Tempered" },
+  };
+  return {
+    ...config,
+    fields: config.fields.flatMap((field) => {
+      if (field.name === "width" || field.name === "height") {
+        return [
+          {
+            ...field,
+            control: "dimension",
+            defaultInches: field.name === "width" ? 24 : 36,
+            min: 12,
+            max: 96,
+            hiddenWhen: { field: "glazing", value: "6mm Tempered" },
+          },
+        ];
+      }
+      if (field.name === "glazing") return [temperedSizeField, field];
+      return [field];
+    }),
+  };
+}
+
 const MIRROR_GLAZING_OPTIONS = [
   "5mm Standard",
   "6mm Mirror",
@@ -956,7 +987,8 @@ function calculateCatalogQuote(type, input = {}) {
   const catalog = SKU_CATALOG[type];
   if (!catalog) return unavailable(`Unsupported calculator type: ${type}`, "unsupported");
   if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
-  if (type === "series_3200" || type === "series_3200_ft") {
+  if (type === "series_3200") return calculateSeries3200CatalogQuote(catalog, input);
+  if (type === "series_3200_ft") {
     return calculateAdjustedCatalogQuote(type, catalog, input);
   }
   const candidate = catalog.rows.find((row) => {
@@ -1072,6 +1104,17 @@ const SERIES_850_TEMPERED_SIZES = [
 
 const SERIES_850_TEMPERED_SIZE_OPTIONS = SERIES_850_TEMPERED_SIZES.map(({ width, height }) => `${width}x${height}`);
 
+const SERIES_3200_TEMPERED_SIZES = [
+  { width: 18, height: 24 },
+  { width: 18, height: 30 },
+  { width: 18, height: 36 },
+  { width: 24, height: 30 },
+  { width: 24, height: 36 },
+  { width: 24, height: 48 },
+];
+
+const SERIES_3200_TEMPERED_SIZE_OPTIONS = SERIES_3200_TEMPERED_SIZES.map(({ width, height }) => `${width}x${height}`);
+
 const SERIES_850_GLAZING = {
   "5mm Standard": { code: "5MM", psfAdd: 0 },
   "6mm Mirror": { code: "6MM", psfAdd: 3.15 },
@@ -1092,6 +1135,35 @@ const SERIES_850_PACKAGING = {
   "Standard 1 Per Box": { code: "C1", addCad: 12 },
 };
 
+const SERIES_3200_FRAME_CODES = {
+  "Brushed Stainless Frame": "N4SS",
+  "Powder Coat Black Frame": "PCBL",
+  "Powder Coat White Frame": "PCWH",
+};
+
+const SERIES_3200_FRAME_SURCHARGES = {
+  "Brushed Stainless Frame": 0,
+  "Powder Coat Black Frame": 0.4,
+  "Powder Coat White Frame": 0.4,
+};
+
+const SERIES_3200_GLAZING = {
+  "5mm Standard": { code: "5MM", psfAdd: 0 },
+  "6mm Mirror": { code: "6MM", psfAdd: 3.15 },
+  "6mm Tempered": { code: "6MMT", psfAdd: 33.6 },
+  "S/S Mirror": { code: "SSGL", psfAdd: 39.5 },
+  "3mm Acrylic": { code: "3MMA", psfAdd: 22 },
+  "6mm Acrylic": { code: "6MMA", psfAdd: 39.5 },
+  "5mm w/ Shatter Stop": { code: "5SHS", psfAdd: 7.25 },
+  "6mm w/ Shatter Stop": { code: "6SHS", psfAdd: 10.4 },
+};
+
+const SERIES_3200_SHELF = {
+  "No Shelf": { code: "NS", multiplier: 0 },
+  "Standard Shelf": { code: "SH", multiplier: 1.5 },
+  "Integral Shelf": { code: "IS", multiplier: 2 },
+};
+
 function roundToQuarter(value) {
   return Math.round((Number(value) + Number.EPSILON) / 0.25) * 0.25;
 }
@@ -1099,6 +1171,12 @@ function roundToQuarter(value) {
 function resolveSeries850MapOption(options, value, fallbackLabel) {
   const label = Object.keys(options).find((option) => normalizedOption(option) === normalizedOption(value)) || fallbackLabel;
   return { label, ...options[label] };
+}
+
+function resolveSeries3200Shelf(value) {
+  const normalized = canonicalOption("shelf", value);
+  const label = Object.keys(SERIES_3200_SHELF).find((option) => canonicalOption("shelf", option) === normalized) || "No Shelf";
+  return { label, ...SERIES_3200_SHELF[label] };
 }
 
 function resolveSeries850Packaging(value) {
@@ -1117,6 +1195,8 @@ function parseSeries850TemperedSize(value) {
   if (!match) return null;
   return { width: Number(match[1]), height: Number(match[2]) };
 }
+
+const parseSizeOption = parseSeries850TemperedSize;
 
 function resolveSeries850Dimensions(input = {}) {
   const temperedSize = parseSeries850TemperedSize(input.temperedSize);
@@ -1141,6 +1221,121 @@ function series850FixedBasePrice(catalog, width, height) {
     valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
   );
   return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
+}
+
+function resolveSeries3200Dimensions(input = {}) {
+  const isTempered = normalizedOption(input.glazing) === "6mm tempered";
+  const temperedSize = isTempered ? parseSizeOption(input.temperedSize) : null;
+  if (temperedSize) return temperedSize;
+  return {
+    width: dimensionValue(input, "width"),
+    height: dimensionValue(input, "height"),
+  };
+}
+
+function series3200TemperedSizeAllowed(width, height) {
+  return SERIES_3200_TEMPERED_SIZES.some((size) => size.width === width && size.height === height);
+}
+
+function series3200FixedBasePrice(catalog, width, height) {
+  const candidate = catalog.rows.find((row) =>
+    row.options.width === width &&
+    row.options.height === height &&
+    valuesEqual(row.options.glazing, "5mm Standard", "glazing") &&
+    valuesEqual(row.options.frameFinishing, "Brushed Stainless Frame", "frameFinishing") &&
+    valuesEqual(row.options.shelf, "No Shelf", "shelf") &&
+    valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
+  );
+  return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
+}
+
+function calculateSeries3200CatalogQuote(catalog, input = {}) {
+  const frameFinishing = Object.hasOwn(SERIES_3200_FRAME_CODES, input.frameFinishing)
+    ? input.frameFinishing
+    : "Brushed Stainless Frame";
+  const glazing = resolveSeries850MapOption(SERIES_3200_GLAZING, input.glazing, "5mm Standard");
+  const shelf = resolveSeries3200Shelf(input.shelf);
+  const packaging = resolveSeries850Packaging(input.packaging);
+  const { width, height } = resolveSeries3200Dimensions(input);
+  if (width <= 0 || height <= 0) return unavailable("Width and height are required.");
+
+  const isTempered = normalizedOption(glazing.label) === "6mm tempered";
+  if (isTempered && !series3200TemperedSizeAllowed(width, height)) {
+    return unavailable("Tempered glazing is only available in the listed stock sizes.");
+  }
+
+  const normalizedWidth = roundUpToEvenInches(width);
+  const normalizedHeight = roundUpToEvenInches(height);
+  if (normalizedWidth < 12 || normalizedHeight < 12) return unavailable("Size outside min/max allowed");
+  if (normalizedWidth > 96 || normalizedHeight > 96) return unavailable("Size outside min/max allowed");
+  if (normalizedWidth > 48 && normalizedHeight > 48) return unavailable("Size outside min/max allowed");
+
+  const squareFeet = (normalizedWidth * normalizedHeight) / 144;
+  const fixedBaseCad = series3200FixedBasePrice(catalog, width, height);
+  const normalBaseCad = 100 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 90);
+  const isOversizeBothSides = normalizedWidth > 36 && normalizedHeight > 36;
+  const oversizeBaseCad = squareFeet * 52.5;
+  const baseListCad = isOversizeBothSides ? oversizeBaseCad : fixedBaseCad || normalBaseCad;
+  const frameSurchargeRate = SERIES_3200_FRAME_SURCHARGES[frameFinishing] ?? 0;
+  const frameSurchargeBaseCad = fixedBaseCad || normalBaseCad;
+  const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
+  const glazingCad = squareFeet * glazing.psfAdd;
+  const shelfCad = normalizedWidth * shelf.multiplier;
+  const packagingCad = packaging.addCad;
+  const listCad = baseListCad + frameSurchargeCad + glazingCad + shelfCad + packagingCad;
+  const price = priceBlock(listCad, input, "series_3200");
+  const imageConfig = CATALOG_IMAGE_FIELDS.series_3200;
+  const frameCode = SERIES_3200_FRAME_CODES[frameFinishing] || "N4SS";
+  const widthLabel = formatDimension(input.widthInches ?? width, input.widthFraction);
+  const heightLabel = formatDimension(input.heightInches ?? height, input.heightFraction);
+  const skuSize = fixedBaseCad ? `${widthLabel}X${heightLabel}` : "CUSTOM";
+  const sku = `M-3200-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
+  const description = `3200 Series ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
+
+  return {
+    ok: true,
+    status: "quoted",
+    type: "series_3200",
+    customerId: input.customerId ?? null,
+    customerGroup: price.customerGroup,
+    discountMultiplier: price.discountMultiplier,
+    selections: {
+      width,
+      height,
+      glazing: glazing.label,
+      frameFinishing,
+      shelf: shelf.label,
+      packaging: packaging.label,
+      ...(isTempered ? { temperedSize: `${width}x${height}` } : {}),
+      quantity: price.quantity,
+    },
+    calculation: {
+      source: "workbook_2026_series_3200_formula",
+      normalizedWidth,
+      normalizedHeight,
+      squareFeet: roundCurrency(squareFeet),
+      fixedBaseCad: fixedBaseCad ? roundCurrency(fixedBaseCad) : null,
+      normalBaseCad: roundCurrency(normalBaseCad),
+      oversizeBaseCad: isOversizeBothSides ? roundCurrency(oversizeBaseCad) : null,
+      basePriceCad: roundCurrency(baseListCad),
+      glazingPsfAdd: glazing.psfAdd,
+      glazingCad: roundCurrency(glazingCad),
+      shelfCad: roundCurrency(shelfCad),
+      packagingCad: roundCurrency(packagingCad),
+      frameSurchargeRate,
+      frameSurchargeCad: roundCurrency(frameSurchargeCad),
+      listCadBeforeCustomerDiscount: roundCurrency(listCad),
+    },
+    price: price.price,
+    sku,
+    description,
+    assets: productAssets({
+      type: "series_3200",
+      prefix: imageConfig.prefix,
+      value: frameFinishing,
+      datasheetName: "series_3200",
+    }),
+  };
 }
 
 function calculateSeries850CatalogQuote(catalog, input = {}) {
@@ -1341,6 +1536,7 @@ const CUSTOM_CALCULATORS = {
 
 export function getWorkbookPublicConfig(type) {
   if (type === "series_850") return series850Config();
+  if (type === "series_3200") return series3200Config();
   if (SKU_CATALOG[type] && type !== "series_3300") return catalogConfig(type);
   const config = CUSTOM_CONFIGS[type] || (type === "series_3300" ? {
     label: "Series 3300 Stainless Steel Mirror",
