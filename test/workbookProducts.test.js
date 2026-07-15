@@ -209,20 +209,35 @@ test("U Guard config uses fraction dimensions and material image swatches", () =
   const wing2 = config.fields.find((field) => field.name === "wing2");
   const length = config.fields.find((field) => field.name === "length");
   const guard = config.fields.find((field) => field.name === "guard");
+  const quarterFractions = [
+    ["0", "0"],
+    ["0.25", "1/4"],
+    ["0.5", "1/2"],
+    ["0.75", "3/4"],
+  ];
+  const wingInches = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const centerInches = [4, 5, 6, 7, 8, 9, 10, 11, 12];
 
   assert.equal(wing1.control, "dimension");
   assert.equal(wing1.defaultInches, 2);
   assert.equal(wing1.min, 0);
-  assert.equal(wing1.max, 24);
+  assert.equal(wing1.max, 12);
+  assert.deepEqual(wing1.inchesOptions, wingInches);
+  assert.deepEqual(wing1.fractionOptions, quarterFractions);
   assert.equal(center.control, "dimension");
   assert.equal(center.defaultInches, 4);
   assert.equal(center.min, 4);
   assert.equal(center.max, 12);
+  assert.deepEqual(center.inchesOptions, centerInches);
+  assert.deepEqual(center.fractionOptions, quarterFractions);
   assert.equal(wing2.control, "dimension");
+  assert.deepEqual(wing2.inchesOptions, wingInches);
+  assert.deepEqual(wing2.fractionOptions, quarterFractions);
   assert.equal(length.control, "dimension");
   assert.equal(length.defaultInches, 72);
   assert.equal(length.min, 4);
   assert.equal(length.max, 120);
+  assert.deepEqual(length.fractionOptions, quarterFractions);
   assert.equal(guard.control, "swatch");
   assert.equal(guard.swatches.length, 6);
   assert.deepEqual(guard.options, [
@@ -233,8 +248,9 @@ test("U Guard config uses fraction dimensions and material image swatches", () =
     "16ga Brushed Bronze",
     "16ga Brushed Black",
   ]);
-  assert.match(guard.swatches[0].imageUrl, /U_GUARDS_18GA_BRUSHED_STEEL-1\.png$/);
-  assert.match(guard.swatches[5].imageUrl, /U_GUARDS_16GA_BRUSHED_BLACK-1\.png$/);
+  assert.match(guard.swatches[0].color, /linear-gradient/);
+  assert.match(guard.swatches[5].color, /#111111/);
+  assert.equal(guard.swatches[0].imageUrl, undefined);
 });
 
 test("Corner Guard config uses quarter fractions and material image swatches", () => {
