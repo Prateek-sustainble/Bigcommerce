@@ -922,6 +922,35 @@ const KICK_PLATE_SWATCHES = KICK_PLATE_ITEMS.map((item) => ({
   color: KICK_PLATE_SWATCH_COLORS[item.label],
 }));
 
+const SHELF_CUSTOMER_FINISHES = [
+  "18GA Brushed Steel",
+  "16GA Brushed Bronze",
+  "16GA Brushed Gold",
+  "16GA Brushed Gunmetal",
+];
+
+const SHELF_SWATCH_COLORS = {
+  "18GA Brushed Steel": "linear-gradient(135deg, #707276 0%, #d5d7d6 48%, #8f9290 100%)",
+  "16GA Brushed Bronze": "linear-gradient(135deg, #704534 0%, #bd927a 50%, #dbc0ad 100%)",
+  "16GA Brushed Gold": "linear-gradient(135deg, #8b6a23 0%, #d6b44c 50%, #f2dda0 100%)",
+  "16GA Brushed Gunmetal": "linear-gradient(135deg, #272723 0%, #595a52 48%, #25251f 100%)",
+};
+
+const SHELF_FINISH_SWATCHES = SHELF_CUSTOMER_FINISHES.map((label) => ({
+  value: label,
+  label,
+  color: SHELF_SWATCH_COLORS[label],
+}));
+
+const shelfFinishField = () => ({
+  name: "finish",
+  label: "Frame Finishing",
+  control: "swatch",
+  options: SHELF_CUSTOMER_FINISHES,
+  swatches: SHELF_FINISH_SWATCHES,
+  default: "18GA Brushed Steel",
+});
+
 const QUARTER_FRACTION_OPTIONS = [
   ["0", "0"],
   ["0.25", "1/4"],
@@ -1503,7 +1532,7 @@ const CUSTOM_CONFIGS = {
       { name: "item", label: "Series", control: "select", options: SHELF_ITEMS.map((item) => item.label), default: "Series 855" },
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      shelfFinishField(),
     ],
   },
   series_855: {
@@ -1511,7 +1540,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      shelfFinishField(),
     ],
   },
   series_3205: {
@@ -1519,7 +1548,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      shelfFinishField(),
     ],
   },
   kick_plates: {

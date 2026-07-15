@@ -604,3 +604,27 @@ test("exposes dynamic field schemas for non-frameless calculators", () => {
   assert.ok(config.fields.every((field) => field.name !== "item"));
   assert.ok(config.customerGroups.includes("Contractor"));
 });
+
+test("exposes customer-facing shelf finishes as swatches", () => {
+  const visibleFinishes = [
+    "18GA Brushed Steel",
+    "16GA Brushed Bronze",
+    "16GA Brushed Gold",
+    "16GA Brushed Gunmetal",
+  ];
+
+  for (const type of ["shelves", "series_855", "series_3205"]) {
+    const config = getCalculatorPublicConfig(type);
+    const finish = config.fields.find((field) => field.name === "finish");
+
+    assert.equal(finish.control, "swatch");
+    assert.deepEqual(finish.options, visibleFinishes);
+    assert.deepEqual(
+      finish.swatches.map((swatch) => swatch.value),
+      visibleFinishes,
+    );
+    assert.equal(finish.options.includes("18GA Black Powder Coat Steel"), false);
+    assert.equal(finish.options.includes("18GA White Powder Coat"), false);
+    assert.match(finish.swatches[0].color, /linear-gradient/);
+  }
+});
