@@ -218,6 +218,36 @@
     );
   }
 
+  // Ask the BigCommerce storefront (same-origin, session-cookie authed) for
+  // the shopper's current cart id. This is the SAME cart the theme's
+  // `utils.api.cart.itemAdd` writes to, so appending here keeps everything
+  // in one cart instead of orphaning the previous one.
+  async function fetchStorefrontCartId() {
+    try {
+      const response = await fetch("/api/storefront/carts", {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return "";
+      const carts = await response.json();
+      if (Array.isArray(carts) && carts.length && carts[0].id) return carts[0].id;
+      if (carts && carts.id) return carts.id;
+      return "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function resolveActiveCartId() {
+    const storefrontCartId = await fetchStorefrontCartId();
+    if (storefrontCartId) {
+      // Keep our local mirror in sync so future adds start from the right id.
+      saveCartId(storefrontCartId);
+      return storefrontCartId;
+    }
+    return loadCartId();
+  }
+
   function setImageSource(image, imageUrl, fallbackImageUrl) {
     if (!image) return;
     image.onerror = () => {
@@ -616,7 +646,7 @@
     try {
       const requestPayload = payload(root, options);
       requestPayload.quoteToken = root.dataset.smQuoteToken || undefined;
-      const existingCartId = loadCartId();
+      const existingCartId = await resolveActiveCartId();
       if (existingCartId) requestPayload.cartId = existingCartId;
       let response;
       try {
