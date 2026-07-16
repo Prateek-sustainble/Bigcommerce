@@ -1547,7 +1547,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      { name: "finish", label: "Frame Finishing", control: "select", options: ["Brushed Steel", "Black Powder Coat", "White Powder Coat"], default: "Brushed Steel" },
     ],
   },
   kick_plates: {
