@@ -42,6 +42,40 @@ test("uses guest pricing when no customer group is provided", () => {
   assert.equal(quote.price.unitCad, 135.72);
 });
 
+test("uses workbook edge-work rates for clear frameless mirrors", () => {
+  const baseInput = {
+    item: "Clear Mirror 5mm",
+    widthInches: 24,
+    heightInches: 36,
+    shatterStop: "No",
+  };
+
+  const cleanCut = calculateFramelessMirrorQuote({
+    ...baseInput,
+    edgeWork: "Clean Cut",
+  });
+  const arrised = calculateFramelessMirrorQuote({
+    ...baseInput,
+    edgeWork: "Arrised Edge",
+  });
+  const polished = calculateFramelessMirrorQuote({
+    ...baseInput,
+    edgeWork: "Polished Edge",
+  });
+
+  assert.equal(cleanCut.ok, true);
+  assert.equal(cleanCut.calculation.edgeWorkPriceCad, 0);
+  assert.equal(cleanCut.price.unitCad, 135.72);
+
+  assert.equal(arrised.ok, true);
+  assert.equal(arrised.calculation.edgeWorkPriceCad, 2.4);
+  assert.equal(arrised.price.unitCad, 138.5);
+
+  assert.equal(polished.ok, true);
+  assert.equal(polished.calculation.edgeWorkPriceCad, 18.6);
+  assert.equal(polished.price.unitCad, 157.3);
+});
+
 test("rejects both sides above the workbook max-both size", () => {
   const quote = calculateFramelessMirrorQuote({
     item: "Clear Mirror 5mm",
