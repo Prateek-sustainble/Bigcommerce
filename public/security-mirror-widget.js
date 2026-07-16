@@ -111,11 +111,7 @@
   }
 
   function payload(root, options) {
-    const data = {
-      type: options.type,
-      customerId: options.customerId ?? null,
-      customerGroup: options.customerGroup || "Guest",
-    };
+    const data = { type: options.type, customerId: options.customerId ?? null };
     root.querySelectorAll("[data-sm-field]").forEach((field) => {
       const name = field.dataset.smField;
       if (!name) return;
@@ -172,13 +168,12 @@
     return Number.isFinite(value) ? value : null;
   }
 
-  function hasCustomerId(customerId) {
-    const normalized = String(customerId ?? "").trim();
-    return Boolean(normalized) && normalized !== "0" && normalized !== "null" && normalized !== "undefined";
+  function usesGuestPricing(customerGroup) {
+    return (normalizeCustomerGroup(customerGroup) || "Guest") === "Guest";
   }
 
   function requiresContactRequest(options) {
-    return !hasCustomerId(options.customerId);
+    return !options.customerId || usesGuestPricing(options.customerGroup);
   }
 
   async function requestJson(url, body) {
@@ -188,8 +183,39 @@
       body: JSON.stringify(body),
     });
     const json = await response.json();
-    if (!response.ok) throw json;
+    if (!response.ok) {
+      const error = Object.assign(new Error(json.message || "Request failed."), json);
+      error.status = response.status;
+      throw error;
+    }
     return json;
+  }
+
+  const CART_ID_STORAGE_KEY = "sm-calculator-cart-id";
+
+  function loadCartId() {
+    try {
+      return window.sessionStorage.getItem(CART_ID_STORAGE_KEY) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function saveCartId(id) {
+    try {
+      if (id) window.sessionStorage.setItem(CART_ID_STORAGE_KEY, id);
+      else window.sessionStorage.removeItem(CART_ID_STORAGE_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
+  function extractCartId(response) {
+    return (
+      response?.cart?.data?.id ||
+      response?.cart?.id ||
+      null
+    );
   }
 
   function setImageSource(image, imageUrl, fallbackImageUrl) {
@@ -590,7 +616,24 @@
     try {
       const requestPayload = payload(root, options);
       requestPayload.quoteToken = root.dataset.smQuoteToken || undefined;
-      const response = await requestJson(`${options.apiBase}/api/cart/add`, requestPayload);
+      const existingCartId = loadCartId();
+      if (existingCartId) requestPayload.cartId = existingCartId;
+      let response;
+      try {
+        response = await requestJson(`${options.apiBase}/api/cart/add`, requestPayload);
+      } catch (error) {
+        // If the saved cart is gone (deleted/expired), drop it and retry once
+        // so we create a fresh cart instead of surfacing a 404 to the shopper.
+        if (existingCartId && (error.status === 404 || error.status === 422)) {
+          saveCartId("");
+          delete requestPayload.cartId;
+          response = await requestJson(`${options.apiBase}/api/cart/add`, requestPayload);
+        } else {
+          throw error;
+        }
+      }
+      const newCartId = extractCartId(response);
+      if (newCartId) saveCartId(newCartId);
       const redirect =
         response.cart?.data?.redirect_urls?.cart_url ||
         response.cart?.data?.redirect_urls?.checkout_url ||
