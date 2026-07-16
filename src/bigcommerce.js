@@ -9,13 +9,25 @@ function pickCartCurrencyPrice(quote, currencyCode) {
   return quote.price.unitCad;
 }
 
+function toAbsoluteImageUrl(imageUrl) {
+  if (!imageUrl) return undefined;
+  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+
+  const baseUrl =
+    process.env.PUBLIC_BASE_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
+    "https://security-mirror-calculator.onrender.com";
+
+  return new URL(imageUrl, baseUrl).toString();
+}
+
 function buildCustomItem(quote, currencyCode) {
   return {
     name: quote.description,
     sku: quote.sku,
     quantity: quote.selections.quantity,
     list_price: pickCartCurrencyPrice(quote, currencyCode),
-    image_url: quote.assets.primaryImageUrl,
+    image_url: toAbsoluteImageUrl(quote.assets.primaryImageUrl || quote.assets.fallbackImageUrl),
   };
 }
 

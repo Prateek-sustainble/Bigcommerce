@@ -101,3 +101,32 @@ test(
     });
   }),
 );
+
+test(
+  "converts relative calculator image paths before sending them to BigCommerce",
+  withBigCommerceEnv(async () => {
+    let request;
+    globalThis.fetch = async (url, options) => {
+      request = { url, options };
+      return {
+        ok: true,
+        json: async () => ({ data: { redirect_urls: { cart_url: "https://example.com/cart" } } }),
+      };
+    };
+
+    const quoteWithRelativeImage = {
+      ...quote,
+      assets: {
+        primaryImageUrl: "",
+        fallbackImageUrl: "/assets/frameless-mirror-placeholder.svg",
+      },
+    };
+
+    await addQuoteToBigCommerceCart({ quote: quoteWithRelativeImage });
+
+    assert.equal(
+      JSON.parse(request.options.body).custom_items[0].image_url,
+      "https://security-mirror-calculator.onrender.com/assets/frameless-mirror-placeholder.svg",
+    );
+  }),
+);
