@@ -278,9 +278,10 @@ function calculateShelvesForItem(itemLabel, input = {}, type = "shelves") {
   const exactFixedPrice = item.label === "Series 855" ? fixedPrice("shelves", { length, depth }) : undefined;
   const squareFeet = (length * depth) / 144;
   const basePriceCad = item.psf * squareFeet;
-  const finishPriceCad = exactFixedPrice !== undefined ? 0 : basePriceCad * (item.finishAdd + finish.add);
+  const finishAdd = item.finishAdd + finish.add;
+  const finishPriceCad = exactFixedPrice !== undefined ? exactFixedPrice * finishAdd : basePriceCad * finishAdd;
   const customChargeCad = exactFixedPrice !== undefined ? 0 : 33.5;
-  const listCad = exactFixedPrice ?? basePriceCad + finishPriceCad + customChargeCad;
+  const listCad = exactFixedPrice !== undefined ? exactFixedPrice + finishPriceCad : basePriceCad + finishPriceCad + customChargeCad;
 
   return quoteResponse({
     input,

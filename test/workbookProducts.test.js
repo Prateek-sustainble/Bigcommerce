@@ -55,6 +55,31 @@ test("quotes workbook fixed tables for shelves, kick plates, and series 3300", (
   assert.equal(series3300.price.unitCad, 311.25);
 });
 
+test("Series 855 fixed shelf sizes still apply finish premiums", () => {
+  const standard = calculateQuote({
+    type: "series_855",
+    customerGroup: "Guest",
+    lengthInches: 16,
+    depthInches: 5,
+    finish: "18GA Brushed Steel",
+  });
+  const premium = calculateQuote({
+    type: "series_855",
+    customerGroup: "Guest",
+    lengthInches: 16,
+    depthInches: 5,
+    finish: "16GA Brushed Gold",
+  });
+
+  assert.equal(standard.ok, true);
+  assert.equal(standard.price.unitCad, 66.75);
+  assert.equal(premium.ok, true);
+  assert.equal(premium.price.unitCad, 100.13);
+  assert.equal(premium.calculation.fixedPriceCad, 66.75);
+  assert.equal(premium.calculation.finishPriceCad, 33.38);
+  assert.equal(premium.sku, "SHELF-855-M-PVGO-CUSTOM");
+});
+
 test("quotes workbook guard profiles", () => {
   const uGuard = calculateQuote({
     type: "u_guard",
