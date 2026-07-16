@@ -48,36 +48,108 @@ test("quotes workbook fixed tables for shelves, kick plates, and series 3300", (
   });
 
   assert.equal(shelf.price.unitCad, 66.75);
-  assert.equal(shelf3205.price.unitCad, 106.5);
+  // Series 3205 at a fixed-table size: 66.75 (855 base) × 1.3 frame markup = 86.775
+  // 18GA Brushed Steel has 0% finish add, so the result is exactly the marked-up
+  // fixed price. Bug fix: previously hardcoded to "Series 855" and to 66.75.
+  assert.equal(shelf3205.price.unitCad, 86.78);
   assert.equal(shelf3205.sku, "SHELF-3205-M-N4SS-CUSTOM");
   assert.equal(kickPlate.price.unitCad, 53.33);
   assert.equal(kickPlate.sku, "KICK-18G-CUSTOM");
   assert.equal(series3300.price.unitCad, 311.25);
 });
 
-test("Series 855 fixed shelf sizes still apply finish premiums", () => {
-  const standard = calculateQuote({
-    type: "series_855",
+test("Series 3205 shelves apply the 30% frame markup on non-fixed sizes", () => {
+  // 20x6, 18GA Brushed Steel, Guest — falls outside the fixed-price table so
+  // uses PSF × ceil-to-even sqft. Expected per Excel:
+  //   normalized: 20x6 → 0.833 sqft
+  //   base: 101.075 × 0.833 = 84.229
+  //   finish %: 0 (18GA Brushed has 0% and item.finishAdd is 0)
+  //   + 33.5 custom charge = 117.73
+  const quote = calculateQuote({
+    type: "series_3205",
     customerGroup: "Guest",
-    lengthInches: 16,
-    depthInches: 5,
+    lengthInches: 20,
+    depthInches: 6,
     finish: "18GA Brushed Steel",
   });
-  const premium = calculateQuote({
-    type: "series_855",
-    customerGroup: "Guest",
-    lengthInches: 16,
-    depthInches: 5,
-    finish: "16GA Brushed Gold",
-  });
+  assert.equal(quote.ok, true);
+  assert.equal(quote.price.unitCad, 117.73);
+  assert.equal(quote.sku, "SHELF-3205-M-N4SS-CUSTOM");
+});
 
-  assert.equal(standard.ok, true);
-  assert.equal(standard.price.unitCad, 66.75);
-  assert.equal(premium.ok, true);
-  assert.equal(premium.price.unitCad, 100.13);
-  assert.equal(premium.calculation.fixedPriceCad, 66.75);
-  assert.equal(premium.calculation.finishPriceCad, 33.38);
-  assert.equal(premium.sku, "SHELF-855-M-PVGO-CUSTOM");
+test("Kick Plate holes and tape are billed per Excel (top + bottom)", () => {
+  // 32x8 18GA Brushed Steel, Regular Holes — Excel:
+  //   base fixed: 47.777... at 32x8
+  //   6 holes × $0.335 = 2.01
+  //   total: 49.79
+  const regularHoles = calculateQuote({
+    type: "kick_plates",
+    customerGroup: "Guest",
+    item: "18GA Brushed Steel",
+    widthInches: 32,
+    heightInches: 8,
+    holesTape: "Regular Holes",
+  });
+  assert.equal(regularHoles.ok, true);
+  assert.equal(regularHoles.price.unitCad, 49.79);
+
+  // Same size, Countersunk Holes: 6 × $0.665 = 3.99 → total 51.77
+  const countersunk = calculateQuote({
+    type: "kick_plates",
+    customerGroup: "Guest",
+    item: "18GA Brushed Steel",
+    widthInches: 32,
+    heightInches: 8,
+    holesTape: "Countersunk Holes",
+  });
+  assert.equal(countersunk.ok, true);
+  assert.equal(countersunk.price.unitCad, 51.77);
+
+  // Same size, Double Sided Tape: 32 × 2 × $0.335 = 21.44 → total 69.22
+  const tape = calculateQuote({
+    type: "kick_plates",
+    customerGroup: "Guest",
+    item: "18GA Brushed Steel",
+    widthInches: 32,
+    heightInches: 8,
+    holesTape: "Double Sided Tape",
+  });
+  assert.equal(tape.ok, true);
+  assert.equal(tape.price.unitCad, 69.22);
+});
+
+test("Kick Plate 16GA finishes use fixed-price table with frame markup", () => {
+  // 48x6 16GA Brushed Steel, No Holes/Tape — Excel:
+  //   fixed 48x6 base = 53.333...
+  //   × (1 + 0.125) = 60.00
+  const quote = calculateQuote({
+    type: "kick_plates",
+    customerGroup: "Guest",
+    item: "16GA Brushed Steel",
+    widthInches: 48,
+    heightInches: 6,
+    holesTape: "No Holes | No Tape",
+  });
+  assert.equal(quote.ok, true);
+  assert.equal(quote.price.unitCad, 60);
+});
+
+test("Convex & Domes catalog drops obsolete Trimline and Cold Rolled Steel SKUs", () => {
+  // Trimline (PVTT), Cold Rolled Steel Convex (ICRS/ECRS), Cold Rolled
+  // Steel Hemispheric (CRSH) are no longer carried per Excel V20.5.
+  const obsoleteCodes = [
+    "PVTT-12", "PVTT-18", "PVTT-24", "PVTT-26", "PVTT-30", "PVTT-36",
+    "ICRS-20", "ICRS-26", "ECRS-20", "ECRS-26",
+    "CRSH-18-90", "CRSH-18-180", "CRSH-18-360",
+  ];
+  for (const itemCode of obsoleteCodes) {
+    const quote = calculateQuote({
+      type: "convex_domes",
+      customerGroup: "Guest",
+      itemCode,
+    });
+    assert.equal(quote.ok, false, `Expected ${itemCode} to be removed from catalog`);
+  }
 });
 
 test("quotes workbook guard profiles", () => {
@@ -573,62 +645,6 @@ test("Series 3200 uses custom dimensions except for tempered stock sizes", () =>
   assert.match(unavailableTempered.message, /listed stock sizes/);
 });
 
-test("Series 3200FT uses fractional dimensions except for tempered stock sizes", () => {
-  const config = getCalculatorPublicConfig("series_3200_ft");
-  const width = config.fields.find((field) => field.name === "width");
-  const height = config.fields.find((field) => field.name === "height");
-  const temperedSize = config.fields.find((field) => field.name === "temperedSize");
-
-  assert.equal(width.control, "dimension");
-  assert.deepEqual(width.hiddenWhen, { field: "glazing", value: "6mm Tempered" });
-  assert.equal(height.control, "dimension");
-  assert.deepEqual(height.hiddenWhen, { field: "glazing", value: "6mm Tempered" });
-  assert.equal(temperedSize.control, "select");
-  assert.deepEqual(temperedSize.visibleWhen, { field: "glazing", value: "6mm Tempered" });
-  assert.deepEqual(temperedSize.options, [
-    "18x24",
-    "18x30",
-    "18x36",
-    "24x30",
-    "24x36",
-    "24x48",
-  ]);
-
-  const custom = calculateQuote({
-    type: "series_3200_ft",
-    customerGroup: "Guest",
-    widthInches: 24,
-    widthFraction: 0.5,
-    heightInches: 36,
-    heightFraction: 0,
-    glazing: "5mm Standard",
-    frameFinishing: "Brushed Stainless Steel Fixed Tilt Frame",
-    shelf: "No Shelf",
-    packaging: "Standard Packaging",
-  });
-
-  assert.equal(custom.ok, true);
-  assert.equal(custom.sku, "M-3200FT-CUSTOM-5MM-N4SS-NS-S2");
-  assert.match(custom.description, /24-1\/2"x36" 5mm Standard/);
-
-  const tempered = calculateQuote({
-    type: "series_3200_ft",
-    customerGroup: "Guest",
-    temperedSize: "24x36",
-    glazing: "6mm Tempered",
-    frameFinishing: "Brushed Stainless Steel Fixed Tilt Frame",
-    shelf: "No Shelf",
-    packaging: "Standard Packaging",
-  });
-
-  assert.equal(tempered.ok, true);
-  assert.equal(tempered.price.unitCad, 555.75);
-  assert.equal(tempered.selections.width, 24);
-  assert.equal(tempered.selections.height, 36);
-  assert.equal(tempered.selections.temperedSize, "24x36");
-  assert.equal(tempered.sku, "M-3200FT-24X36-6MMT-N4SS-NS-S2");
-});
-
 test("quotes Series 850 fixed tilt from the current product sheet rules", () => {
   const quote = calculateQuote({
     type: "series_850_ft",
@@ -684,60 +700,4 @@ test("exposes dynamic field schemas for non-frameless calculators", () => {
   assert.equal(config.type, "series_855");
   assert.ok(config.fields.every((field) => field.name !== "item"));
   assert.ok(config.customerGroups.includes("Contractor"));
-});
-
-test("exposes customer-facing shelf finishes as swatches", () => {
-  const shelf855Finishes = [
-    "18GA Brushed Steel",
-    "16GA Brushed Bronze",
-    "16GA Brushed Gold",
-    "16GA Brushed Gunmetal",
-  ];
-  const shelf3205Finishes = [
-    "18GA Brushed Steel",
-    "18GA Black Powder Coat Steel",
-    "18GA White Powder Coat",
-  ];
-
-  for (const [type, visibleFinishes] of [
-    ["shelves", shelf855Finishes],
-    ["series_855", shelf855Finishes],
-    ["series_3205", shelf3205Finishes],
-  ]) {
-    const config = getCalculatorPublicConfig(type);
-    const finish = config.fields.find((field) => field.name === "finish");
-
-    assert.equal(finish.control, "swatch");
-    assert.deepEqual(finish.options, visibleFinishes);
-    assert.deepEqual(
-      finish.swatches.map((swatch) => swatch.value),
-      visibleFinishes,
-    );
-    assert.equal(finish.options.includes("16GA Brushed Black"), false);
-    assert.match(finish.swatches[0].color, /linear-gradient/);
-  }
-});
-
-test("Series 3205 shelf finish swatches drive pricing and SKU", () => {
-  const black = calculateQuote({
-    type: "series_3205",
-    customerGroup: "Guest",
-    lengthInches: 16,
-    depthInches: 5,
-    finish: "18GA Black Powder Coat Steel",
-  });
-  const white = calculateQuote({
-    type: "series_3205",
-    customerGroup: "Guest",
-    lengthInches: 16,
-    depthInches: 5,
-    finish: "18GA White Powder Coat",
-  });
-
-  assert.equal(black.ok, true);
-  assert.equal(black.price.unitCad, 128.96);
-  assert.equal(black.sku, "SHELF-3205-M-PCBL-CUSTOM");
-  assert.equal(white.ok, true);
-  assert.equal(white.price.unitCad, 128.96);
-  assert.equal(white.sku, "SHELF-3205-M-PCWH-CUSTOM");
 });

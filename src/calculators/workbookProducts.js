@@ -275,13 +275,32 @@ function calculateShelvesForItem(itemLabel, input = {}, type = "shelves") {
   const depth = dimensionValue(input, "depth");
   if (length < 12 || depth < 4 || length > 96 || depth > 12) return unavailable("Size outside min/max allowed");
 
-  const exactFixedPrice = item.label === "Series 855" ? fixedPrice("shelves", { length, depth }) : undefined;
-  const squareFeet = (length * depth) / 144;
+  // Excel Shelves!O17: fixed-price table applies to BOTH Series 855 and 3205.
+  // The workbook looks the table up against the ACTUAL length/depth (F7+G7,
+  // H7+I7), not the rounded-up-to-even-inch values used for sqft. For Series
+  // 3205 the looked-up price is multiplied by 1.3 (item.fixedMultiplier).
+  const fixedMultiplier = item.fixedMultiplier ?? 1;
+  const rawFixedPrice = fixedPrice("shelves", { length, depth });
+  const exactFixedPrice = rawFixedPrice !== undefined ? rawFixedPrice * fixedMultiplier : undefined;
+
+  // Excel Shelves!O20/O21: normalize length + depth UP to the next even inch
+  // before computing square footage for the PSF-based branch.
+  const normalizedLength = roundUpToEvenInches(length);
+  const normalizedDepth = roundUpToEvenInches(depth);
+  const squareFeet = (normalizedLength * normalizedDepth) / 144;
   const basePriceCad = item.psf * squareFeet;
-  const finishAdd = item.finishAdd + finish.add;
-  const finishPriceCad = exactFixedPrice !== undefined ? exactFixedPrice * finishAdd : basePriceCad * finishAdd;
+  // Finish % (O31) is applied on top of BOTH the fixed price (O18 = O17 + O17*O31)
+  // and the PSF-based price (O29 = O28 + O28*O31). item.finishAdd should be 0 for
+  // both series now; the 30% for 3205 is baked into psf.
+  const finishPercent = item.finishAdd + finish.add;
+  const finishPriceCad = exactFixedPrice !== undefined
+    ? exactFixedPrice * finishPercent
+    : basePriceCad * finishPercent;
+  // O33: $33.50 custom charge only for non-fixed-size shelves.
   const customChargeCad = exactFixedPrice !== undefined ? 0 : 33.5;
-  const listCad = exactFixedPrice !== undefined ? exactFixedPrice + finishPriceCad : basePriceCad + finishPriceCad + customChargeCad;
+  const listCad = exactFixedPrice !== undefined
+    ? exactFixedPrice + finishPriceCad
+    : basePriceCad + finishPriceCad + customChargeCad;
 
   return quoteResponse({
     input,
@@ -328,12 +347,20 @@ function calculateKickPlates(input = {}) {
   const normalizedWidth = roundUpToEvenInches(width);
   const normalizedHeight = roundUpToEvenInches(height);
   const squareFeet = Math.max(2, (normalizedWidth * normalizedHeight) / 144);
-  const exactFixedPrice = item.abbreviation === "18G"
-    ? fixedPrice("kick_plates", { width: normalizedWidth, height: normalizedHeight })
-    : undefined;
+  // Excel Kick Plates!O17: fixed-price table applies to ALL frame finishes,
+  // multiplied by (1 + item.add) — 18G no markup, 16G Brushed +12.5%,
+  // 16G Gold/Bronze/Black +26.5625%. Lookup uses ACTUAL dimensions
+  // (F7+G7, H7+I7), not the even-inch normalized sqft values.
+  const rawFixedPrice = fixedPrice("kick_plates", { width, height });
+  const exactFixedPrice = rawFixedPrice !== undefined ? rawFixedPrice * (1 + item.add) : undefined;
   const sizePriceCad = exactFixedPrice ?? item.psf * squareFeet;
-  const holesPriceCad = Math.ceil(normalizedWidth / 12) * holesTape.holesPerWidth;
-  const tapePriceCad = normalizedWidth * holesTape.tapePerInch;
+  // Excel Kick Plates!O25/O27: number_of_holes = CEILING(width, 12)/12 * 2
+  // (L24 = 2 holes per 12" block). Multiply the ceil-block count by 2 for
+  // top + bottom rows before applying the per-hole rate.
+  const holesPriceCad = Math.ceil(normalizedWidth / 12) * 2 * holesTape.holesPerWidth;
+  // Excel Kick Plates!O29/O31: tape_length = width * 2 (L26 = 2" of tape per
+  // inch of width — top + bottom edges), times cost per inch.
+  const tapePriceCad = normalizedWidth * 2 * holesTape.tapePerInch;
   const listCad = sizePriceCad + holesPriceCad + tapePriceCad;
   const { widthLabel, heightLabel } = inputDimensionLabels(input);
 
@@ -703,8 +730,8 @@ function series850Config() {
   };
 }
 
-function series3200Config(type = "series_3200") {
-  const config = catalogConfig(type);
+function series3200Config() {
+  const config = catalogConfig("series_3200");
   const temperedSizeField = {
     name: "temperedSize",
     label: "Size",
@@ -923,47 +950,6 @@ const KICK_PLATE_SWATCHES = KICK_PLATE_ITEMS.map((item) => ({
   color: KICK_PLATE_SWATCH_COLORS[item.label],
 }));
 
-const SHELF_855_FINISHES = [
-  "18GA Brushed Steel",
-  "16GA Brushed Bronze",
-  "16GA Brushed Gold",
-  "16GA Brushed Gunmetal",
-];
-
-const SHELF_3205_FINISHES = [
-  "18GA Brushed Steel",
-  "18GA Black Powder Coat Steel",
-  "18GA White Powder Coat",
-];
-
-const SHELF_SWATCH_COLORS = {
-  "18GA Brushed Steel": "linear-gradient(135deg, #707276 0%, #d5d7d6 48%, #8f9290 100%)",
-  "18GA Black Powder Coat Steel": "linear-gradient(135deg, #050505 0%, #272727 48%, #111111 100%)",
-  "18GA White Powder Coat": "linear-gradient(135deg, #e7e7e5 0%, #ffffff 52%, #d7d7d2 100%)",
-  "16GA Brushed Bronze": "linear-gradient(135deg, #704534 0%, #bd927a 50%, #dbc0ad 100%)",
-  "16GA Brushed Gold": "linear-gradient(135deg, #8b6a23 0%, #d6b44c 50%, #f2dda0 100%)",
-  "16GA Brushed Gunmetal": "linear-gradient(135deg, #272723 0%, #595a52 48%, #25251f 100%)",
-};
-
-function shelfSwatches(finishes) {
-  return finishes.map((label) => ({
-    value: label,
-    label,
-    color: SHELF_SWATCH_COLORS[label],
-  }));
-}
-
-function shelfFinishField(finishes = SHELF_855_FINISHES) {
-  return {
-    name: "finish",
-    label: "Frame Finishing",
-    control: "swatch",
-    options: finishes,
-    swatches: shelfSwatches(finishes),
-    default: finishes[0],
-  };
-}
-
 const QUARTER_FRACTION_OPTIONS = [
   ["0", "0"],
   ["0.25", "1/4"],
@@ -1091,7 +1077,7 @@ function calculateCatalogQuote(type, input = {}) {
   if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
   if (type === "series_3200") return calculateSeries3200CatalogQuote(catalog, input);
   if (type === "series_3200_ft") {
-    return calculateSeries3200FixedTiltCatalogQuote(catalog, input);
+    return calculateAdjustedCatalogQuote(type, catalog, input);
   }
   const candidate = catalog.rows.find((row) => {
     if (type === "convex_domes" && input.itemCode) return valuesEqual(row.options.itemCode, input.itemCode, "itemCode");
@@ -1243,22 +1229,10 @@ const SERIES_3200_FRAME_CODES = {
   "Powder Coat White Frame": "PCWH",
 };
 
-const SERIES_3200_FT_FRAME_CODES = {
-  "Brushed Stainless Steel Fixed Tilt Frame": "N4SS",
-  "Powder Coat Black Stainless Steel Fixed Tilt Frame": "PCBL",
-  "Powder Coat White Stainless Steel Fixed Tilt Frame": "PCWH",
-};
-
 const SERIES_3200_FRAME_SURCHARGES = {
   "Brushed Stainless Frame": 0,
   "Powder Coat Black Frame": 0.4,
   "Powder Coat White Frame": 0.4,
-};
-
-const SERIES_3200_FT_FRAME_SURCHARGES = {
-  "Brushed Stainless Steel Fixed Tilt Frame": 0,
-  "Powder Coat Black Stainless Steel Fixed Tilt Frame": 0.4,
-  "Powder Coat White Stainless Steel Fixed Tilt Frame": 0.4,
 };
 
 const SERIES_3200_GLAZING = {
@@ -1351,48 +1325,22 @@ function series3200TemperedSizeAllowed(width, height) {
   return SERIES_3200_TEMPERED_SIZES.some((size) => size.width === width && size.height === height);
 }
 
-function series3200FixedBasePrice(catalog, width, height, type = "series_3200") {
-  const baseFrame = type === "series_3200_ft"
-    ? "Brushed Stainless Steel Fixed Tilt Frame"
-    : "Brushed Stainless Frame";
+function series3200FixedBasePrice(catalog, width, height) {
   const candidate = catalog.rows.find((row) =>
     row.options.width === width &&
     row.options.height === height &&
     valuesEqual(row.options.glazing, "5mm Standard", "glazing") &&
-    valuesEqual(row.options.frameFinishing, baseFrame, "frameFinishing") &&
+    valuesEqual(row.options.frameFinishing, "Brushed Stainless Frame", "frameFinishing") &&
     valuesEqual(row.options.shelf, "No Shelf", "shelf") &&
     valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
   );
   return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
 }
 
-function calculateSeries3200FixedTiltCatalogQuote(catalog, input = {}) {
-  const { width, height } = resolveSeries3200Dimensions(input);
-  const exactInput = { ...input, width, height };
-  const exactQuote = calculateAdjustedCatalogQuote("series_3200_ft", catalog, exactInput);
-  if (exactQuote.ok) {
-    const isTempered = normalizedOption(exactQuote.selections.glazing) === "6mm tempered";
-    return {
-      ...exactQuote,
-      selections: {
-        ...exactQuote.selections,
-        ...(isTempered ? { temperedSize: `${width}x${height}` } : {}),
-      },
-    };
-  }
-  return calculateSeries3200CatalogQuote(catalog, input, "series_3200_ft");
-}
-
-function calculateSeries3200CatalogQuote(catalog, input = {}, type = "series_3200") {
-  const isFixedTilt = type === "series_3200_ft";
-  const frameCodes = isFixedTilt ? SERIES_3200_FT_FRAME_CODES : SERIES_3200_FRAME_CODES;
-  const frameSurcharges = isFixedTilt ? SERIES_3200_FT_FRAME_SURCHARGES : SERIES_3200_FRAME_SURCHARGES;
-  const defaultFrame = isFixedTilt ? "Brushed Stainless Steel Fixed Tilt Frame" : "Brushed Stainless Frame";
-  const seriesLabel = isFixedTilt ? "3200FT Series" : "3200 Series";
-  const skuPrefix = isFixedTilt ? "M-3200FT" : "M-3200";
-  const frameFinishing = Object.hasOwn(frameCodes, input.frameFinishing)
+function calculateSeries3200CatalogQuote(catalog, input = {}) {
+  const frameFinishing = Object.hasOwn(SERIES_3200_FRAME_CODES, input.frameFinishing)
     ? input.frameFinishing
-    : defaultFrame;
+    : "Brushed Stainless Frame";
   const glazing = resolveSeries850MapOption(SERIES_3200_GLAZING, input.glazing, "5mm Standard");
   const shelf = resolveSeries3200Shelf(input.shelf);
   const packaging = resolveSeries850Packaging(input.packaging);
@@ -1411,31 +1359,31 @@ function calculateSeries3200CatalogQuote(catalog, input = {}, type = "series_320
   if (normalizedWidth > 48 && normalizedHeight > 48) return unavailable("Size outside min/max allowed");
 
   const squareFeet = (normalizedWidth * normalizedHeight) / 144;
-  const fixedBaseCad = series3200FixedBasePrice(catalog, width, height, type);
+  const fixedBaseCad = series3200FixedBasePrice(catalog, width, height);
   const normalBaseCad = 100 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 90);
   const isOversizeBothSides = normalizedWidth > 36 && normalizedHeight > 36;
   const oversizeBaseCad = squareFeet * 52.5;
   const baseListCad = isOversizeBothSides ? oversizeBaseCad : fixedBaseCad || normalBaseCad;
-  const frameSurchargeRate = frameSurcharges[frameFinishing] ?? 0;
+  const frameSurchargeRate = SERIES_3200_FRAME_SURCHARGES[frameFinishing] ?? 0;
   const frameSurchargeBaseCad = fixedBaseCad || normalBaseCad;
   const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
   const glazingCad = squareFeet * glazing.psfAdd;
   const shelfCad = normalizedWidth * shelf.multiplier;
   const packagingCad = packaging.addCad;
   const listCad = baseListCad + frameSurchargeCad + glazingCad + shelfCad + packagingCad;
-  const price = priceBlock(listCad, input, type);
-  const imageConfig = CATALOG_IMAGE_FIELDS[type];
-  const frameCode = frameCodes[frameFinishing] || "N4SS";
+  const price = priceBlock(listCad, input, "series_3200");
+  const imageConfig = CATALOG_IMAGE_FIELDS.series_3200;
+  const frameCode = SERIES_3200_FRAME_CODES[frameFinishing] || "N4SS";
   const widthLabel = formatDimension(input.widthInches ?? width, input.widthFraction);
   const heightLabel = formatDimension(input.heightInches ?? height, input.heightFraction);
   const skuSize = fixedBaseCad ? `${widthLabel}X${heightLabel}` : "CUSTOM";
-  const sku = `${skuPrefix}-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
-  const description = `${seriesLabel} ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
+  const sku = `M-3200-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
+  const description = `3200 Series ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
 
   return {
     ok: true,
     status: "quoted",
-    type,
+    type: "series_3200",
     customerId: input.customerId ?? null,
     customerGroup: price.customerGroup,
     discountMultiplier: price.discountMultiplier,
@@ -1450,7 +1398,7 @@ function calculateSeries3200CatalogQuote(catalog, input = {}, type = "series_320
       quantity: price.quantity,
     },
     calculation: {
-      source: isFixedTilt ? "workbook_2026_series_3200ft_formula" : "workbook_2026_series_3200_formula",
+      source: "workbook_2026_series_3200_formula",
       normalizedWidth,
       normalizedHeight,
       squareFeet: roundCurrency(squareFeet),
@@ -1470,10 +1418,10 @@ function calculateSeries3200CatalogQuote(catalog, input = {}, type = "series_320
     sku,
     description,
     assets: productAssets({
-      type,
+      type: "series_3200",
       prefix: imageConfig.prefix,
       value: frameFinishing,
-      datasheetName: type,
+      datasheetName: "series_3200",
     }),
   };
 }
@@ -1583,7 +1531,7 @@ const CUSTOM_CONFIGS = {
       { name: "item", label: "Series", control: "select", options: SHELF_ITEMS.map((item) => item.label), default: "Series 855" },
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      shelfFinishField(),
+      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
   series_855: {
@@ -1591,7 +1539,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      shelfFinishField(),
+      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
   series_3205: {
@@ -1599,7 +1547,7 @@ const CUSTOM_CONFIGS = {
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      shelfFinishField(SHELF_3205_FINISHES),
+      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
   kick_plates: {
@@ -1676,8 +1624,7 @@ const CUSTOM_CALCULATORS = {
 
 export function getWorkbookPublicConfig(type) {
   if (type === "series_850") return series850Config();
-  if (type === "series_3200") return series3200Config("series_3200");
-  if (type === "series_3200_ft") return series3200Config("series_3200_ft");
+  if (type === "series_3200") return series3200Config();
   if (SKU_CATALOG[type] && type !== "series_3300") return catalogConfig(type);
   const config = CUSTOM_CONFIGS[type] || (type === "series_3300" ? {
     label: "Series 3300 Stainless Steel Mirror",

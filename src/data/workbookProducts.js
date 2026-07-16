@@ -46,9 +46,13 @@ export const CUT_GLASS_ITEMS = [
   },
 ];
 
+// psf for Series 3205 already includes the 30% frame markup vs Series 855
+// (Excel Shelves!V14 = V13 * 1.3). Do NOT re-apply that markup via finishAdd.
+// The fixed-price table (FIXED_PRICE_TABLES.shelves) is shared by both series;
+// for Series 3205 the calculator multiplies the looked-up price by fixedMultiplier.
 export const SHELF_ITEMS = [
-  { label: "Series 855", abbreviation: "855-M", psf: 77.75, finishAdd: 0 },
-  { label: "Series 3205", abbreviation: "3205-M", psf: 101.075, finishAdd: 0.3 },
+  { label: "Series 855", abbreviation: "855-M", psf: 77.75, finishAdd: 0, fixedMultiplier: 1 },
+  { label: "Series 3205", abbreviation: "3205-M", psf: 101.075, finishAdd: 0, fixedMultiplier: 1.3 },
 ];
 
 export const SHELF_FINISHES = [
