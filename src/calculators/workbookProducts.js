@@ -567,7 +567,8 @@ function calculateCornerGuards(input = {}) {
   const wing1 = dimensionValue(input, "wing1");
   const wing2 = dimensionValue(input, "wing2");
   const length = dimensionValue(input, "length");
-  const angle = numberOrZero(input.angle || 90);
+  const rawAngle = numberOrZero(input.angle || 90);
+const angle = Math.min(170, Math.max(90, rawAngle));
   if (wing1 < 0.5 || wing2 < 0.5 || wing1 > 12 || wing2 > 12 || length < 4 || length > 120) {
     return unavailable("Size outside min/max allowed");
   }
@@ -1674,7 +1675,7 @@ const CUSTOM_CONFIGS = {
       { name: "easedEdge", label: "Eased Edge Y/N", control: "select", options: ["Yes", "No"], default: "No" },
       { name: "holes", label: "Holes Y/N", control: "select", options: ["Yes", "No", "Countersunk"], default: "No" },
       { name: "tape", label: "Tape Y/N", control: "select", options: ["Yes", "No"], default: "No" },
-      { name: "angle", label: "Angle", control: "number", default: 90, min: 90, max: 170, step: 5 },
+      { name: "angle", label: "Angle", control: "number", default: 90, min: 90, max: 170, step: 1 },
     ],
   },
   j_mould: {
