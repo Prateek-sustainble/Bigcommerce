@@ -646,6 +646,18 @@ function uniqueOptions(rows, field) {
 
 function catalogConfig(type) {
   const catalog = SKU_CATALOG[type];
+    const convexItemCodesByCategory =
+    type === "convex_domes"
+      ? Object.fromEntries(
+          uniqueOptions(catalog.rows, "category").map((category) => [
+            category,
+            uniqueOptions(
+              catalog.rows.filter((row) => valuesEqual(row.options.category, category, "category")),
+              "itemCode",
+            ),
+          ]),
+        )
+      : null;
   const fields = catalog.fields.map((field) => {
     const rawOptions = uniqueOptions(catalog.rows, field);
     const configuredOptions = CATALOG_OPTION_OVERRIDES[type]?.[field] || rawOptions;
@@ -657,13 +669,34 @@ function catalogConfig(type) {
     const orderedOptions = swatchConfig
       ? swatchConfig.swatches.map((swatch) => swatch.value).filter((value) => configuredOptions.includes(value))
       : sortedOptions;
+        const defaultValue = preferredDefault(type, field, orderedOptions);
+
+    if (type === "convex_domes" && field === "itemCode") {
+      const defaultCategory = preferredDefault(
+        type,
+        "category",
+        uniqueOptions(catalog.rows, "category"),
+      );
+      const dependentOptions = convexItemCodesByCategory?.[defaultCategory] || orderedOptions;
+
+      return {
+        name: field,
+        label: fieldLabels[field] || field,
+        control: "select",
+        options: dependentOptions,
+        dependsOn: "category",
+        optionMap: convexItemCodesByCategory,
+        default: dependentOptions.includes(defaultValue) ? defaultValue : dependentOptions[0],
+      };
+    }
+
     return {
       name: field,
       label: fieldLabels[field] || field,
       control: swatchConfig ? "swatch" : "select",
       options: orderedOptions,
       swatches: swatchConfig?.swatches.filter((swatch) => orderedOptions.includes(swatch.value)),
-      default: preferredDefault(type, field, orderedOptions),
+      default: defaultValue,
     };
   });
   return {

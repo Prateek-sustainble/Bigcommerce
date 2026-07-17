@@ -325,10 +325,14 @@ function payload(root, options) {
         </div>
       `;
     }
+        const dependencyAttributes = field.dependsOn
+      ? ` data-sm-depends-on="${escapeHtml(field.dependsOn)}" data-sm-option-map="${escapeHtml(encodeURIComponent(JSON.stringify(field.optionMap || {})))}" data-sm-default="${escapeHtml(defaultValue)}"`
+      : "";
+
     return `
       <div class="sm-row" ${condition}>
         <label>${label}</label>
-        <select data-sm-field="${escapeHtml(field.name)}">${optionMarkup(field.options || [])}</select>
+        <select data-sm-field="${escapeHtml(field.name)}"${dependencyAttributes}>${optionMarkup(field.options || [])}</select>
       </div>
     `;
   }
@@ -356,7 +360,37 @@ function payload(root, options) {
       });
     });
   }
+  function syncDependentSelects(root) {
+    root.querySelectorAll("select[data-sm-depends-on]").forEach((select) => {
+      const parentFieldName = select.dataset.smDependsOn;
+      const parentField = qs(root, `[data-sm-field='${parentFieldName}']`);
+      if (!parentField) return;
 
+      let optionMap = {};
+      try {
+        optionMap = JSON.parse(decodeURIComponent(select.dataset.smOptionMap || ""));
+      } catch {
+        optionMap = {};
+      }
+
+      const parentValue = parentField.value || "";
+      const allowedOptions = optionMap[parentValue] || [];
+      if (!allowedOptions.length) return;
+
+      const previousValue = select.value;
+      const defaultValue = select.dataset.smDefault || allowedOptions[0];
+
+      select.innerHTML = optionMarkup(allowedOptions);
+
+      if (allowedOptions.includes(previousValue)) {
+        select.value = previousValue;
+      } else if (allowedOptions.includes(defaultValue)) {
+        select.value = defaultValue;
+      } else {
+        select.value = allowedOptions[0];
+      }
+    });
+  }
   function renderShell(root, config, options) {
     const fields = config.fields || [
       { name: "item", label: "Finishing", control: "select", options: config.items || [], default: (config.items || [])[0] },
