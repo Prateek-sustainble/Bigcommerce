@@ -110,20 +110,32 @@
       .join("");
   }
 
-  function payload(root, options) {
-    const data = { type: options.type, customerId: options.customerId ?? null };
-    root.querySelectorAll("[data-sm-field]").forEach((field) => {
-      const name = field.dataset.smField;
-      if (!name) return;
-      if (field.disabled) return;
-      if (field.type === "number") {
-        data[name] = Number(field.value);
-        return;
-      }
-      data[name] = field.value;
-    });
-    return data;
-  }
+function payload(root, options) {
+  const data = {
+    type: options.type,
+    customerId: options.customerId ?? null,
+    customerGroup: options.customerGroup || "Guest",
+  };
+
+  root.querySelectorAll("[data-sm-field]").forEach((field) => {
+    const name = field.dataset.smField;
+    if (!name) return;
+
+    // customerGroup is controlled from options when locked/hidden
+    if (name === "customerGroup") return;
+
+    if (field.disabled) return;
+
+    if (field.type === "number") {
+      data[name] = Number(field.value);
+      return;
+    }
+
+    data[name] = field.value;
+  });
+
+  return data;
+}
 
   function normalizeCustomerGroup(value) {
     if (!value) return "";
