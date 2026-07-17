@@ -5,7 +5,7 @@
     type: "frameless_mirror",
     customerGroup: "House",
     customerId: null,
-    contactEmail: "smi@securitymirror.com",
+    contactEmail: "craigbigcommerce@gmail.com,craigb@securitymirror.com",
     defaultItem: "",
     hideCustomerField: false,
     hideItemField: false,
@@ -197,7 +197,7 @@ function payload(root, options) {
     const json = await response.json();
     if (!response.ok) {
       const error = Object.assign(new Error(json.message || "Request failed."), json);
-      error.status = response.status;
+      error.httpStatus = response.status;
       throw error;
     }
     return json;
@@ -796,7 +796,7 @@ function payload(root, options) {
       status.textContent = response.message || "Thank you. We received your request.";
       form.reset();
     } catch (error) {
-      if (error.status === "contact_request_not_configured") {
+      if (error.status === "contact_request_not_configured" || error.httpStatus === 501) {
         status.textContent = "Opening your email app to send the request.";
         openEmailFallback(root, { ...options, contactEmail: error.recipient || options.contactEmail });
       } else {
