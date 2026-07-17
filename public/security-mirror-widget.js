@@ -541,6 +541,7 @@ function payload(root, options) {
       if (itemSelect) itemSelect.setAttribute("disabled", "disabled");
     }
 
+    syncDependentSelects(root);
     applyAccessMode(root, options);
     syncConditionalFields(root);
   }
@@ -847,10 +848,12 @@ function payload(root, options) {
     );
     renderShell(root, configResponse.config, options);
     root.addEventListener("input", () => {
+      syncDependentSelects(root);
       syncConditionalFields(root);
       updateQuote(root, options);
     });
     root.addEventListener("change", () => {
+      syncDependentSelects(root);
       syncConditionalFields(root);
       updateQuote(root, options);
     });
