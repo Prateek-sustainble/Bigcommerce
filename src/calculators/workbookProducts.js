@@ -128,7 +128,21 @@ const DATASHEET_FILE_NAMES = {
   EXTERIOR_ACRYLIC_CONVEX_MIRROR: "EXTERIOR_ACRYLIC_CONVEX_MIRROR.pdf",
 };
 
-function datasheets(name) {
+function convexDatasheetSlug(name) {
+  return String(name || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+}
+
+function datasheets(name, type) {
+  if (type === "convex_domes") {
+    const slug = convexDatasheetSlug(name);
+    return {
+      en: `https://saddlebrown-turkey-900185.hostingersite.com/datasheet/${slug}.pdf`,
+      fr: `https://saddlebrown-turkey-900185.hostingersite.com/datasheet_fr/${slug}_FR.pdf`,
+    };
+  }
   const key = slug(name, "_", "upper");
   const englishFile = DATASHEET_FILE_NAMES[key] || `${key}.pdf`;
   const frenchFile = englishFile.replace(/\.pdf$/i, "_FR.pdf");
@@ -147,7 +161,7 @@ function productAssets({ type, prefix, value, datasheetName }) {
     value,
     baseUrl: IMAGE_BASE_URL,
     fallbackImageUrl,
-    datasheets: datasheets(datasheetName || value),
+    datasheets: datasheets(datasheetName || value, type),
     primaryImageUrl: assetSet?.primaryImageUrl || fallbackImageUrl,
     galleryUrls: assetSet?.galleryUrls || [],
   });
