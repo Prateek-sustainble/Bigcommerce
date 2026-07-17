@@ -996,7 +996,17 @@ const KICK_PLATE_SWATCHES = KICK_PLATE_ITEMS.map((item) => ({
   label: item.label,
   color: KICK_PLATE_SWATCH_COLORS[item.label],
 }));
-
+const SERIES_855_SWATCHES = [
+  { value: "18GA Brushed Steel", label: "18GA Brushed Steel", color: "linear-gradient(180deg, #d7d7d7 0%, #a8a8a8 50%, #dcdcdc 100%)" },
+  { value: "16GA Brushed Bronze", label: "16GA Brushed Bronze", color: "linear-gradient(180deg, #b38867 0%, #8a654a 50%, #b89173 100%)" },
+  { value: "16GA Brushed Gold", label: "16GA Brushed Gold", color: "linear-gradient(180deg, #f0d96b 0%, #c9a93a 50%, #f4de7d 100%)" },
+  { value: "16GA Brushed Gunmetal", label: "16GA Brushed Gunmetal", color: "linear-gradient(180deg, #5b5b59 0%, #2f2f2d 50%, #686866 100%)" },
+];
+const SERIES_3205_SWATCHES = [
+  { value: "18GA Brushed Steel", label: "18GA Brushed Steel", color: "linear-gradient(180deg, #d7d7d7 0%, #a8a8a8 50%, #dcdcdc 100%)" },
+  { value: "18GA Black Powder Coat Steel", label: "18GA Black Powder Coat Steel", color: "linear-gradient(180deg, #1f1f1f 0%, #050505 50%, #262626 100%)" },
+  { value: "18GA White Powder Coat", label: "18GA White Powder Coat", color: "linear-gradient(180deg, #f8f8f8 0%, #e8e8e8 50%, #ffffff 100%)" },
+];
 const QUARTER_FRACTION_OPTIONS = [
   ["0", "0"],
   ["0.25", "1/4"],
@@ -1581,20 +1591,43 @@ const CUSTOM_CONFIGS = {
       { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
     ],
   },
-  series_855: {
+    series_855: {
     label: "Series 855 Steel Shelves",
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Frame Finishing", control: "select", options: SHELF_FINISHES.map((finish) => finish.label), default: "18GA Brushed Steel" },
+      {
+        name: "finish",
+        label: "Frame Finishing",
+        control: "swatch",
+        options: [
+          "18GA Brushed Steel",
+          "16GA Brushed Bronze",
+          "16GA Brushed Gold",
+          "16GA Brushed Gunmetal",
+        ],
+        swatches: SERIES_855_SWATCHES,
+        default: "18GA Brushed Steel",
+      },
     ],
   },
-  series_3205: {
+    series_3205: {
     label: "Series 3205 Steel Shelves",
     fields: [
       { name: "length", label: "Length", control: "dimension", defaultInches: 16, min: 12, max: 96 },
       { name: "depth", label: "Depth", control: "dimension", defaultInches: 5, min: 4, max: 12 },
-      { name: "finish", label: "Frame Finishing", control: "select", options: ["Brushed Steel", "Black Powder Coat", "White Powder Coat"], default: "Brushed Steel" },
+      {
+        name: "finish",
+        label: "Frame Finishing",
+        control: "swatch",
+        options: [
+          "18GA Brushed Steel",
+          "18GA Black Powder Coat Steel",
+          "18GA White Powder Coat",
+        ],
+        swatches: SERIES_3205_SWATCHES,
+        default: "18GA Brushed Steel",
+      },
     ],
   },
   kick_plates: {
