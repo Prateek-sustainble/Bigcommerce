@@ -575,6 +575,46 @@ test("quotes Series 3200 and 3200FT against the current workbook list prices", (
   assert.match(fixedTilt.description, /Brushed Stainless Steel Fixed Tilt Frame No Shelf Standard Packaging$/);
 });
 
+test("Series 3200FT applies workbook finish surcharges and fractional custom sizing", () => {
+  const stock = calculateQuote({
+    type: "series_3200_ft",
+    customerGroup: "Guest",
+    width: 24,
+    height: 36,
+    glazing: "5mm Standard",
+    frameFinishing: "Powder Coat Black Stainless Steel Fixed Tilt Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(stock.ok, true);
+  assert.equal(stock.price.unitCad, 484.4);
+  assert.equal(stock.calculation.fixedBaseCad, 346);
+  assert.equal(stock.calculation.frameSurchargeRate, 0.4);
+  assert.equal(stock.calculation.frameSurchargeCad, 138.4);
+
+  const custom = calculateQuote({
+    type: "series_3200_ft",
+    customerGroup: "Guest",
+    widthInches: 24,
+    widthFraction: 0.25,
+    heightInches: 36,
+    heightFraction: 0,
+    glazing: "5mm Standard",
+    frameFinishing: "Brushed Stainless Steel Fixed Tilt Frame",
+    shelf: "No Shelf",
+    packaging: "Standard Packaging",
+  });
+
+  assert.equal(custom.ok, true);
+  assert.equal(custom.calculation.normalizedWidth, 26);
+  assert.equal(custom.calculation.squareFeet, 6.5);
+  assert.equal(custom.calculation.customPsfCad, 65.25);
+  assert.equal(custom.calculation.customBaseCad, 424.13);
+  assert.equal(custom.price.unitCad, 424.13);
+  assert.ok(custom.price.unitCad > 346);
+});
+
 test("Series 3200 uses custom dimensions except for tempered stock sizes", () => {
   const config = getCalculatorPublicConfig("series_3200");
   const width = config.fields.find((field) => field.name === "width");

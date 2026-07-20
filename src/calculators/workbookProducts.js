@@ -1167,9 +1167,7 @@ function calculateCatalogQuote(type, input = {}) {
   if (!catalog) return unavailable(`Unsupported calculator type: ${type}`, "unsupported");
   if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
   if (type === "series_3200") return calculateSeries3200CatalogQuote(catalog, input);
-  if (type === "series_3200_ft") return calculateSeries3200FixedTiltQuote(catalog, input); {
-  return calculateSeries3200FixedTiltQuote(catalog, input);
-} 
+  if (type === "series_3200_ft") return calculateSeries3200FixedTiltQuote(catalog, input);
   const candidate = catalog.rows.find((row) => {
     if (type === "convex_domes" && input.itemCode) return valuesEqual(row.options.itemCode, input.itemCode, "itemCode");
     return catalog.fields.every((field) => valuesEqual(row.options[field], input[field], field));
@@ -1629,26 +1627,33 @@ function calculateSeries3200FixedTiltQuote(catalog, input = {}) {
   }
 
   const normalizedFinish = normalizedOption(frameFinishing);
-const isStandardStainless =
-  normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
+  const isStandardStainless =
+    normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
 
-if (isStandardStainless) {
-  if (normalizedWidth > 48 || normalizedHeight > 48) {
+  if (isStandardStainless && (normalizedWidth > 48 || normalizedHeight > 48)) {
     return unavailable("Size outside min/max allowed");
   }
-}
 
-const squareFeet = (normalizedWidth * normalizedHeight) / 144;
+  // Excel calculates pricing from the even-inch dimensions. Fractions therefore
+  // move a quote to the next calculation size instead of being discarded.
+  const squareFeet = (normalizedWidth * normalizedHeight) / 144;
 
-const fixedBaseCad = series3200FtFixedBasePrice(catalog, width, height);
-const isExactStockSize = Boolean(fixedBaseCad);
+  // N28 in the workbook is the 2026 stock base for the normalized dimensions.
+  // It is independent of glazing, shelf, packaging, and finish; those are added
+  // separately below. The catalog stores the prior list, so apply the workbook's
+  // 1.04 update and quarter-dollar rounding used by S18:S24.
+  const fixedBaseCad = series3200FtFixedBasePrice(catalog, normalizedWidth, normalizedHeight);
+  const isExactStockSize = Boolean(fixedBaseCad);
 
-const customPsfCad = isStandardStainless ? 52.5 : 65.25;
-const customBaseCad = squareFeet * customPsfCad;
+  const customPsfCad = 65.25;
+  const customBaseCad = squareFeet * customPsfCad;
+  const customFrameBaseCad =
+    100 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 90);
+  const frameSurchargeRate = SERIES_3200_FT_FRAME_SURCHARGES[frameFinishing] ?? 0;
+  const frameSurchargeBaseCad = isExactStockSize ? fixedBaseCad : customFrameBaseCad;
+  const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
 
-const baseListCad = isExactStockSize ? fixedBaseCad : customBaseCad;
-
-const frameSurchargeCad = 0;
+  const baseListCad = isExactStockSize ? fixedBaseCad : customBaseCad;
 
   const glazingCad = squareFeet * glazing.psfAdd;
   const shelfCad = normalizedWidth * shelf.multiplier;
@@ -1663,7 +1668,7 @@ const frameSurchargeCad = 0;
   const widthLabel = formatDimension(input.widthInches ?? width, input.widthFraction);
   const heightLabel = formatDimension(input.heightInches ?? height, input.heightFraction);
 
-  const skuSize = isTempered ? `${width}X${height}` : "CUSTOM";
+  const skuSize = isExactStockSize ? `${width}X${height}` : "CUSTOM";
   const sku = `M-3200FT-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
   const description = `3200FT Series ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
 
@@ -1690,15 +1695,16 @@ const frameSurchargeCad = 0;
       normalizedHeight,
       squareFeet: roundCurrency(squareFeet),
       fixedBaseCad: fixedBaseCad ? roundCurrency(fixedBaseCad) : null,
-customBaseCad: !isExactStockSize ? roundCurrency(customBaseCad) : null,
-customPsfCad: !isExactStockSize ? customPsfCad : null,
-basePriceCad: roundCurrency(baseListCad),
+      customBaseCad: !isExactStockSize ? roundCurrency(customBaseCad) : null,
+      customPsfCad: !isExactStockSize ? customPsfCad : null,
+      normalBaseCad: !isExactStockSize ? roundCurrency(customFrameBaseCad) : null,
+      basePriceCad: roundCurrency(baseListCad),
       glazingPsfAdd: glazing.psfAdd,
       glazingCad: roundCurrency(glazingCad),
       shelfCad: roundCurrency(shelfCad),
       packagingCad: roundCurrency(packagingCad),
-frameSurchargeRate: 0,
-frameSurchargeCad: roundCurrency(frameSurchargeCad),
+      frameSurchargeRate,
+      frameSurchargeCad: roundCurrency(frameSurchargeCad),
       listCadBeforeCustomerDiscount: roundCurrency(listCad),
     },
     price: price.price,
