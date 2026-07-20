@@ -1643,10 +1643,6 @@ const squareFeet = (normalizedWidth * normalizedHeight) / 144;
 const fixedBaseCad = series3200FtFixedBasePrice(catalog, width, height);
 const isExactStockSize = Boolean(fixedBaseCad);
 
-const normalizedFinish = normalizedOption(frameFinishing);
-const isStandardStainless =
-  normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
-
 const customPsfCad = isStandardStainless ? 52.5 : 65.25;
 const customBaseCad = squareFeet * customPsfCad;
 
