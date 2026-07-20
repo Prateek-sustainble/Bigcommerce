@@ -1629,42 +1629,27 @@ function calculateSeries3200FixedTiltQuote(catalog, input = {}) {
   }
 
   const normalizedFinish = normalizedOption(frameFinishing);
-  const isStandardStainless =
-    normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
+const isStandardStainless =
+  normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
 
-  const isColoredFixedTilt = [
-    normalizedOption("Powder Coat Black Stainless Steel Fixed Tilt Frame"),
-    normalizedOption("Powder Coat White Stainless Steel Fixed Tilt Frame"),
-  ].includes(normalizedFinish);
-
-  if (isStandardStainless) {
-    if (normalizedWidth > 48 || normalizedHeight > 48) {
-      return unavailable("Size outside min/max allowed");
-    }
+if (isStandardStainless) {
+  if (normalizedWidth > 48 || normalizedHeight > 48) {
+    return unavailable("Size outside min/max allowed");
   }
+}
 
-  if (isColoredFixedTilt) {
-    if (normalizedWidth > 36 || normalizedHeight > 36) {
-      return unavailable("Size outside min/max allowed");
-    }
-    if (normalizedWidth > 24 && normalizedHeight > 24) {
-      return unavailable("Size outside min/max allowed");
-    }
-  }
+const squareFeet = (normalizedWidth * normalizedHeight) / 144;
 
-  const squareFeet = (normalizedWidth * normalizedHeight) / 144;
+const fixedBaseCad = series3200FtFixedBasePrice(catalog, width, height);
+const normalBaseCad = 100 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 90);
+const isOversizeBothSides = normalizedWidth > 36 && normalizedHeight > 36;
+const oversizeBaseCad = squareFeet * 52.5;
 
-  const fixedBaseCad = series3200FtFixedBasePrice(catalog, width, height);
+const baseListCad = isOversizeBothSides ? oversizeBaseCad : fixedBaseCad || normalBaseCad;
 
-  const customColorPsfCad = 65.25;
-  const customColorBaseCad = squareFeet * customColorPsfCad;
-
-  const standardBaseCad = fixedBaseCad || squareFeet * 65.25;
-
-  const baseListCad = isColoredFixedTilt ? customColorBaseCad : standardBaseCad;
-
-  const frameSurchargeRate = SERIES_3200_FT_FRAME_SURCHARGES[frameFinishing] ?? 0;
-  const frameSurchargeCad = isColoredFixedTilt ? 0 : baseListCad * frameSurchargeRate;
+const frameSurchargeRate = SERIES_3200_FT_FRAME_SURCHARGES[frameFinishing] ?? 0;
+const frameSurchargeBaseCad = fixedBaseCad || normalBaseCad;
+const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
 
   const glazingCad = squareFeet * glazing.psfAdd;
   const shelfCad = normalizedWidth * shelf.multiplier;
@@ -1706,7 +1691,8 @@ function calculateSeries3200FixedTiltQuote(catalog, input = {}) {
       normalizedHeight,
       squareFeet: roundCurrency(squareFeet),
       fixedBaseCad: fixedBaseCad ? roundCurrency(fixedBaseCad) : null,
-      customColorBaseCad: isColoredFixedTilt ? roundCurrency(customColorBaseCad) : null,
+      normalBaseCad: roundCurrency(normalBaseCad),
+oversizeBaseCad: isOversizeBothSides ? roundCurrency(oversizeBaseCad) : null,
       basePriceCad: roundCurrency(baseListCad),
       glazingPsfAdd: glazing.psfAdd,
       glazingCad: roundCurrency(glazingCad),
