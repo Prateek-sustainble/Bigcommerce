@@ -1167,7 +1167,7 @@ function calculateCatalogQuote(type, input = {}) {
   if (!catalog) return unavailable(`Unsupported calculator type: ${type}`, "unsupported");
   if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
   if (type === "series_3200") return calculateSeries3200CatalogQuote(catalog, input);
-  if (type === "series_3200_ft") {
+  if (type === "series_3200_ft") return calculateSeries3200FixedTiltQuote(catalog, input); {
   return calculateSeries3200FixedTiltQuote(catalog, input);
 } 
   const candidate = catalog.rows.find((row) => {
@@ -1355,6 +1355,35 @@ const SERIES_3200_SHELF = {
   "Integral Shelf": { code: "IS", multiplier: 2 },
 };
 
+const SERIES_3200_FT_FRAME_CODES = {
+  "Brushed Stainless Steel Fixed Tilt Frame": "N4SS",
+  "Powder Coat Black Stainless Steel Fixed Tilt Frame": "PCBL",
+  "Powder Coat White Stainless Steel Fixed Tilt Frame": "PCWH",
+};
+
+const SERIES_3200_FT_FRAME_SURCHARGES = {
+  "Brushed Stainless Steel Fixed Tilt Frame": 0,
+  "Powder Coat Black Stainless Steel Fixed Tilt Frame": 0.4,
+  "Powder Coat White Stainless Steel Fixed Tilt Frame": 0.4,
+};
+
+const SERIES_3200_FT_SHELF = {
+  "No Shelf": { code: "NS", multiplier: 0 },
+  "Standard Shelf": { code: "SH", multiplier: 1.5 },
+  Integral: { code: "IS", multiplier: 2 },
+};
+
+const SERIES_3200_FT_GLAZING = {
+  "5mm Standard": { code: "5MM", psfAdd: 0 },
+  "6mm Mirror": { code: "6MM", psfAdd: 3.15 },
+  "6mm Tempered": { code: "6MMT", psfAdd: 33.6 },
+  "S/S Mirror": { code: "SSGL", psfAdd: 39.5 },
+  "3mm Acrylic": { code: "3MMA", psfAdd: 22 },
+  "6mm Acrylic": { code: "6MMA", psfAdd: 39.5 },
+  "5mm w/ Shatter Stop": { code: "5SHS", psfAdd: 7.25 },
+  "6mm w/ Shatter Stop": { code: "6SHS", psfAdd: 10.4 },
+};
+
 function roundToQuarter(value) {
   return Math.round((Number(value) + Number.EPSILON) / 0.25) * 0.25;
 }
@@ -1368,6 +1397,16 @@ function resolveSeries3200Shelf(value) {
   const normalized = canonicalOption("shelf", value);
   const label = Object.keys(SERIES_3200_SHELF).find((option) => canonicalOption("shelf", option) === normalized) || "No Shelf";
   return { label, ...SERIES_3200_SHELF[label] };
+}
+
+function resolveSeries3200FtShelf(value) {
+  const normalized = canonicalOption("shelf", value);
+  const label =
+    Object.keys(SERIES_3200_FT_SHELF).find(
+      (option) => canonicalOption("shelf", option) === normalized,
+    ) || "No Shelf";
+
+  return { label, ...SERIES_3200_FT_SHELF[label] };
 }
 
 function resolveSeries850Packaging(value) {
@@ -1428,6 +1467,17 @@ function resolveSeries3200Dimensions(input = {}) {
   };
 }
 
+function resolveSeries3200FtDimensions(input = {}) {
+  const isTempered = normalizedOption(input.glazing) === "6mm tempered";
+  const temperedSize = isTempered ? parseSizeOption(input.temperedSize) : null;
+  if (temperedSize) return temperedSize;
+
+  return {
+    width: dimensionValue(input, "width"),
+    height: dimensionValue(input, "height"),
+  };
+}
+
 function series3200TemperedSizeAllowed(width, height) {
   return SERIES_3200_TEMPERED_SIZES.some((size) => size.width === width && size.height === height);
 }
@@ -1441,6 +1491,23 @@ function series3200FixedBasePrice(catalog, width, height) {
     valuesEqual(row.options.shelf, "No Shelf", "shelf") &&
     valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
   );
+  return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
+}
+
+function series3200FtFixedBasePrice(catalog, width, height) {
+  const candidate = catalog.rows.find((row) =>
+    row.options.width === width &&
+    row.options.height === height &&
+    valuesEqual(row.options.glazing, "5mm Standard", "glazing") &&
+    valuesEqual(
+      row.options.frameFinishing,
+      "Brushed Stainless Steel Fixed Tilt Frame",
+      "frameFinishing",
+    ) &&
+    valuesEqual(row.options.shelf, "No Shelf", "shelf") &&
+    valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
+  );
+
   return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
 }
 
@@ -1529,6 +1596,134 @@ function calculateSeries3200CatalogQuote(catalog, input = {}) {
       prefix: imageConfig.prefix,
       value: frameFinishing,
       datasheetName: "series_3200",
+    }),
+  };
+}
+
+function calculateSeries3200FixedTiltQuote(catalog, input = {}) {
+  const frameFinishing = Object.hasOwn(SERIES_3200_FT_FRAME_CODES, input.frameFinishing)
+    ? input.frameFinishing
+    : "Brushed Stainless Steel Fixed Tilt Frame";
+
+  const glazing = resolveSeries850MapOption(SERIES_3200_GLAZING, input.glazing, "5mm Standard");
+  const shelf = resolveSeries3200FtShelf(input.shelf);
+  const packaging = resolveSeries850Packaging(input.packaging);
+  const { width, height } = resolveSeries3200FtDimensions(input);
+
+  if (width <= 0 || height <= 0) return unavailable("Width and height are required.");
+
+  const isTempered = normalizedOption(glazing.label) === "6mm tempered";
+  if (isTempered && !series3200FtTemperedSizeAllowed(width, height)) {
+    return unavailable("Tempered glazing is only available in the listed stock sizes.");
+  }
+
+  const normalizedWidth = roundUpToEvenInches(width);
+  const normalizedHeight = roundUpToEvenInches(height);
+
+  if (normalizedWidth < 12 || normalizedHeight < 12) {
+    return unavailable("Size outside min/max allowed");
+  }
+
+  if (normalizedWidth > 60 || normalizedHeight > 60) {
+    return unavailable("Size outside min/max allowed");
+  }
+
+  const normalizedFinish = normalizedOption(frameFinishing);
+  const isStandardStainless =
+    normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
+
+  const isColoredFixedTilt = [
+    normalizedOption("Powder Coat Black Stainless Steel Fixed Tilt Frame"),
+    normalizedOption("Powder Coat White Stainless Steel Fixed Tilt Frame"),
+  ].includes(normalizedFinish);
+
+  if (isStandardStainless) {
+    if (normalizedWidth > 48 || normalizedHeight > 48) {
+      return unavailable("Size outside min/max allowed");
+    }
+  }
+
+  if (isColoredFixedTilt) {
+    if (normalizedWidth > 36 || normalizedHeight > 36) {
+      return unavailable("Size outside min/max allowed");
+    }
+    if (normalizedWidth > 24 && normalizedHeight > 24) {
+      return unavailable("Size outside min/max allowed");
+    }
+  }
+
+  const squareFeet = (normalizedWidth * normalizedHeight) / 144;
+
+  const fixedBaseCad = series3200FtFixedBasePrice(catalog, width, height);
+
+  const customColorPsfCad = 65.25;
+  const customColorBaseCad = squareFeet * customColorPsfCad;
+
+  const standardBaseCad = fixedBaseCad || squareFeet * 65.25;
+
+  const baseListCad = isColoredFixedTilt ? customColorBaseCad : standardBaseCad;
+
+  const frameSurchargeRate = SERIES_3200_FT_FRAME_SURCHARGES[frameFinishing] ?? 0;
+  const frameSurchargeCad = isColoredFixedTilt ? 0 : baseListCad * frameSurchargeRate;
+
+  const glazingCad = squareFeet * glazing.psfAdd;
+  const shelfCad = normalizedWidth * shelf.multiplier;
+  const packagingCad = packaging.addCad;
+
+  const listCad = baseListCad + frameSurchargeCad + glazingCad + shelfCad + packagingCad;
+  const price = priceBlock(listCad, input, "series_3200_ft");
+
+  const imageConfig = CATALOG_IMAGE_FIELDS.series_3200_ft;
+  const frameCode = SERIES_3200_FT_FRAME_CODES[frameFinishing] || "N4SS";
+
+  const widthLabel = formatDimension(input.widthInches ?? width, input.widthFraction);
+  const heightLabel = formatDimension(input.heightInches ?? height, input.heightFraction);
+
+  const skuSize = isTempered ? `${width}X${height}` : "CUSTOM";
+  const sku = `M-3200FT-${skuSize}-${glazing.code}-${frameCode}-${shelf.code}-${packaging.code}`;
+  const description = `3200FT Series ${widthLabel}"x${heightLabel}" ${glazing.label} ${frameFinishing} ${shelf.label} ${packaging.label}`;
+
+  return {
+    ok: true,
+    status: "quoted",
+    type: "series_3200_ft",
+    customerId: input.customerId ?? null,
+    customerGroup: price.customerGroup,
+    discountMultiplier: price.discountMultiplier,
+    selections: {
+      width,
+      height,
+      glazing: glazing.label,
+      frameFinishing,
+      shelf: shelf.label,
+      packaging: packaging.label,
+      ...(isTempered ? { temperedSize: `${width}x${height}` } : {}),
+      quantity: price.quantity,
+    },
+    calculation: {
+      source: "workbook_2026_series_3200ft_formula",
+      normalizedWidth,
+      normalizedHeight,
+      squareFeet: roundCurrency(squareFeet),
+      fixedBaseCad: fixedBaseCad ? roundCurrency(fixedBaseCad) : null,
+      customColorBaseCad: isColoredFixedTilt ? roundCurrency(customColorBaseCad) : null,
+      basePriceCad: roundCurrency(baseListCad),
+      glazingPsfAdd: glazing.psfAdd,
+      glazingCad: roundCurrency(glazingCad),
+      shelfCad: roundCurrency(shelfCad),
+      packagingCad: roundCurrency(packagingCad),
+      frameSurchargeRate,
+      frameSurchargeCad: roundCurrency(frameSurchargeCad),
+      listCadBeforeCustomerDiscount: roundCurrency(listCad),
+    },
+    price: price.price,
+    sku,
+    description,
+    assets: productAssets({
+      type: "series_3200_ft",
+      prefix: imageConfig.prefix,
+      value: frameFinishing,
+      datasheetName: "series_3200_ft",
     }),
   };
 }
