@@ -809,6 +809,39 @@ function series3200Config() {
   };
 }
 
+function series3200FixedTiltConfig() {
+  const config = catalogConfig("series_3200_ft");
+  const temperedSizeField = {
+    name: "temperedSize",
+    label: "Size",
+    control: "select",
+    options: SERIES_3200_FT_TEMPERED_SIZE_OPTIONS,
+    default: "24x36",
+    visibleWhen: { field: "glazing", value: "6mm Tempered" },
+  };
+
+  return {
+    ...config,
+    fields: config.fields.flatMap((field) => {
+      if (field.name === "width" || field.name === "height") {
+        return [
+          {
+            ...field,
+            control: "dimension",
+            defaultInches: field.name === "width" ? 24 : 36,
+            min: 12,
+            max: 60,
+            hiddenWhen: { field: "glazing", value: "6mm Tempered" },
+          },
+        ];
+      }
+
+      if (field.name === "glazing") return [temperedSizeField, field];
+      return [field];
+    }),
+  };
+}
+
 const MIRROR_GLAZING_OPTIONS = [
   "5mm Standard",
   "6mm Mirror",
@@ -1135,8 +1168,8 @@ function calculateCatalogQuote(type, input = {}) {
   if (type === "series_850") return calculateSeries850CatalogQuote(catalog, input);
   if (type === "series_3200") return calculateSeries3200CatalogQuote(catalog, input);
   if (type === "series_3200_ft") {
-    return calculateAdjustedCatalogQuote(type, catalog, input);
-  }
+  return calculateSeries3200FixedTiltQuote(catalog, input);
+} 
   const candidate = catalog.rows.find((row) => {
     if (type === "convex_domes" && input.itemCode) return valuesEqual(row.options.itemCode, input.itemCode, "itemCode");
     return catalog.fields.every((field) => valuesEqual(row.options[field], input[field], field));
@@ -1261,6 +1294,18 @@ const SERIES_3200_TEMPERED_SIZES = [
 
 const SERIES_3200_TEMPERED_SIZE_OPTIONS = SERIES_3200_TEMPERED_SIZES.map(({ width, height }) => `${width}x${height}`);
 
+const SERIES_3200_FT_TEMPERED_SIZES = [
+  { width: 18, height: 30 },
+  { width: 18, height: 36 },
+  { width: 18, height: 48 },
+  { width: 24, height: 30 },
+  { width: 24, height: 36 },
+  { width: 24, height: 48 },
+];
+
+const SERIES_3200_FT_TEMPERED_SIZE_OPTIONS =
+  SERIES_3200_FT_TEMPERED_SIZES.map(({ width, height }) => `${width}x${height}`);
+
 const SERIES_850_GLAZING = {
   "5mm Standard": { code: "5MM", psfAdd: 0 },
   "6mm Mirror": { code: "6MM", psfAdd: 3.15 },
@@ -1367,6 +1412,10 @@ function series850FixedBasePrice(catalog, width, height) {
     valuesEqual(row.options.packaging, "Standard Packaging", "packaging"),
   );
   return candidate ? roundToQuarter(candidate.prices.Guest * 1.04) : 0;
+}
+
+function series3200FtTemperedSizeAllowed(width, height) {
+  return SERIES_3200_FT_TEMPERED_SIZES.some((size) => size.width === width && size.height === height);
 }
 
 function resolveSeries3200Dimensions(input = {}) {
@@ -1704,9 +1753,10 @@ const CUSTOM_CALCULATORS = {
 };
 
 export function getWorkbookPublicConfig(type) {
-  if (type === "series_850") return series850Config();
-  if (type === "series_3200") return series3200Config();
-  if (SKU_CATALOG[type] && type !== "series_3300") return catalogConfig(type);
+if (type === "series_850") return series850Config();
+if (type === "series_3200") return series3200Config();
+if (type === "series_3200_ft") return series3200FixedTiltConfig();
+if (SKU_CATALOG[type] && type !== "series_3300") return catalogConfig(type);
   const config = CUSTOM_CONFIGS[type] || (type === "series_3300" ? {
     label: "Series 3300 Stainless Steel Mirror",
     fields: [
