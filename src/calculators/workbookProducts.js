@@ -1641,15 +1641,18 @@ if (isStandardStainless) {
 const squareFeet = (normalizedWidth * normalizedHeight) / 144;
 
 const fixedBaseCad = series3200FtFixedBasePrice(catalog, width, height);
-const normalBaseCad = 100 + squareFeet * (20 + (normalizedWidth * normalizedHeight) / 90);
-const isOversizeBothSides = normalizedWidth > 36 && normalizedHeight > 36;
-const oversizeBaseCad = squareFeet * 52.5;
+const isExactStockSize = Boolean(fixedBaseCad);
 
-const baseListCad = isOversizeBothSides ? oversizeBaseCad : fixedBaseCad || normalBaseCad;
+const normalizedFinish = normalizedOption(frameFinishing);
+const isStandardStainless =
+  normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
 
-const frameSurchargeRate = SERIES_3200_FT_FRAME_SURCHARGES[frameFinishing] ?? 0;
-const frameSurchargeBaseCad = fixedBaseCad || normalBaseCad;
-const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
+const customPsfCad = isStandardStainless ? 52.5 : 65.25;
+const customBaseCad = squareFeet * customPsfCad;
+
+const baseListCad = isExactStockSize ? fixedBaseCad : customBaseCad;
+
+const frameSurchargeCad = 0;
 
   const glazingCad = squareFeet * glazing.psfAdd;
   const shelfCad = normalizedWidth * shelf.multiplier;
@@ -1691,9 +1694,9 @@ const frameSurchargeCad = frameSurchargeBaseCad * frameSurchargeRate;
       normalizedHeight,
       squareFeet: roundCurrency(squareFeet),
       fixedBaseCad: fixedBaseCad ? roundCurrency(fixedBaseCad) : null,
-      normalBaseCad: roundCurrency(normalBaseCad),
-oversizeBaseCad: isOversizeBothSides ? roundCurrency(oversizeBaseCad) : null,
-      basePriceCad: roundCurrency(baseListCad),
+customBaseCad: !isExactStockSize ? roundCurrency(customBaseCad) : null,
+customPsfCad: !isExactStockSize ? customPsfCad : null,
+basePriceCad: roundCurrency(baseListCad),
       glazingPsfAdd: glazing.psfAdd,
       glazingCad: roundCurrency(glazingCad),
       shelfCad: roundCurrency(shelfCad),
