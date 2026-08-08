@@ -1622,17 +1622,16 @@ function calculateSeries3200FixedTiltQuote(catalog, input = {}) {
     return unavailable("Size outside min/max allowed");
   }
 
-  if (normalizedWidth > 60 || normalizedHeight > 60) {
-    return unavailable("Size outside min/max allowed");
-  }
+const maxOneSide = 60;
+const maxBothSides = 48;
 
-  const normalizedFinish = normalizedOption(frameFinishing);
-  const isStandardStainless =
-    normalizedFinish === normalizedOption("Brushed Stainless Steel Fixed Tilt Frame");
+if (normalizedWidth > maxOneSide || normalizedHeight > maxOneSide) {
+  return unavailable("Size outside min/max allowed");
+}
 
-  if (isStandardStainless && (normalizedWidth > 48 || normalizedHeight > 48)) {
-    return unavailable("Size outside min/max allowed");
-  }
+if (normalizedWidth > maxBothSides && normalizedHeight > maxBothSides) {
+  return unavailable("Size outside min/max allowed");
+}
 
   // Excel calculates pricing from the even-inch dimensions. Fractions therefore
   // move a quote to the next calculation size instead of being discarded.
