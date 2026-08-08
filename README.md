@@ -2,6 +2,8 @@
 
 In-house replacement for the Calculator Studio + Grid pricing flow.
 
+For deployment, maintenance, pricing, images, datasheets, customer groups, and troubleshooting, see the [Client Handover Guide](docs/CLIENT-HANDOVER-GUIDE.md).
+
 This implements the Security Mirror pricing calculators from `FINAL EXCEL SM Fin V20.5 (1).xlsx` and exposes them as:
 
 - A Render-ready Node API.
